@@ -23,7 +23,9 @@ void main() {
 	
 	gl_FragColor = vec4(color.xyz, 1.0); 
 	
-	gl_FragDepthEXT = depth;
+	#if defined(GL_EXT_frag_depth)
+		gl_FragDepthEXT = depth;
+	#endif
 
 
 }

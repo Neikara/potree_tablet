@@ -1,12 +1,12 @@
 
 import * as THREE from "../../libs/three.js/build/three.module.js";
-import {PointCloudSM} from "../utils/PointCloudSM.js";
-import {EyeDomeLightingMaterial} from "../materials/EyeDomeLightingMaterial.js";
-import {SphereVolume} from "../utils/Volume.js";
-import {Utils} from "../utils.js";
+import { PointCloudSM } from "../utils/PointCloudSM.js";
+import { EyeDomeLightingMaterial } from "../materials/EyeDomeLightingMaterial.js";
+import { SphereVolume } from "../utils/Volume.js";
+import { Utils } from "../utils.js";
 
-export class EDLRenderer{
-	constructor(viewer){
+export class EDLRenderer {
+	constructor(viewer) {
 		this.viewer = viewer;
 
 		this.edlMaterial = null;
@@ -19,7 +19,7 @@ export class EDLRenderer{
 		this.shadowMap = new PointCloudSM(this.viewer.pRenderer);
 	}
 
-	initEDL(){
+	initEDL() {
 		if (this.edlMaterial != null) {
 			return;
 		}
@@ -45,27 +45,27 @@ export class EDLRenderer{
 		});
 	};
 
-	resize(width, height){
-		if(this.screenshot){
+	resize(width, height) {
+		if (this.screenshot) {
 			width = this.screenshot.target.width;
 			height = this.screenshot.target.height;
 		}
 
-		this.rtEDL.setSize(width , height);
-		this.rtRegular.setSize(width , height);
+		this.rtEDL.setSize(width, height);
+		this.rtRegular.setSize(width, height);
 	}
 
-	makeScreenshot(camera, size, callback){
+	makeScreenshot(camera, size, callback) {
 
-		if(camera === undefined || camera === null){
+		if (camera === undefined || camera === null) {
 			camera = this.viewer.scene.getActiveCamera();
 		}
 
-		if(size === undefined || size === null){
+		if (size === undefined || size === null) {
 			size = this.viewer.renderer.getSize(new THREE.Vector2());
 		}
 
-		let {width, height} = size;
+		let { width, height } = size;
 
 		//let maxTextureSize = viewer.renderer.capabilities.maxTextureSize;
 		//if(width * 4 < 
@@ -92,7 +92,7 @@ export class EDLRenderer{
 
 		// flip vertically
 		let bytesPerLine = width * 4;
-		for(let i = 0; i < parseInt(height / 2); i++){
+		for (let i = 0; i < parseInt(height / 2); i++) {
 			let j = height - i - 1;
 
 			let lineI = buffer.slice(i * bytesPerLine, i * bytesPerLine + bytesPerLine);
@@ -111,28 +111,28 @@ export class EDLRenderer{
 		};
 	}
 
-	clearTargets(){
+	clearTargets() {
 		const viewer = this.viewer;
-		const {renderer} = viewer;
+		const { renderer } = viewer;
 
 		const oldTarget = renderer.getRenderTarget();
 
-		renderer.setRenderTarget( this.rtEDL );
-		renderer.clear( true, true, true );
+		renderer.setRenderTarget(this.rtEDL);
+		renderer.clear(true, true, true);
 
-		renderer.setRenderTarget( this.rtRegular );
-		renderer.clear( true, true, false );
+		renderer.setRenderTarget(this.rtRegular);
+		renderer.clear(true, true, false);
 
 		renderer.setRenderTarget(oldTarget);
 	}
 
-	clear(){
+	clear() {
 		this.initEDL();
 		const viewer = this.viewer;
 
-		const {renderer, background} = viewer;
+		const { renderer, background } = viewer;
 
-		if(background === "skybox"){
+		if (background === "skybox") {
 			renderer.setClearColor(0x000000, 0);
 		} else if (background === 'gradient') {
 			renderer.setClearColor(0x000000, 0);
@@ -143,24 +143,24 @@ export class EDLRenderer{
 		} else {
 			renderer.setClearColor(0x000000, 0);
 		}
-		
+
 		renderer.clear();
 
 		this.clearTargets();
 	}
 
-	renderShadowMap(visiblePointClouds, camera, lights){
+	renderShadowMap(visiblePointClouds, camera, lights) {
 
-		const {viewer} = this;
+		const { viewer } = this;
 
 		const doShadows = lights.length > 0 && !(lights[0].disableShadowUpdates);
-		if(doShadows){
+		if (doShadows) {
 			let light = lights[0];
 
 			this.shadowMap.setLight(light);
 
 			let originalAttributes = new Map();
-			for(let pointcloud of viewer.scene.pointclouds){
+			for (let pointcloud of viewer.scene.pointclouds) {
 				// TODO IMPORTANT !!! check
 				originalAttributes.set(pointcloud, pointcloud.material.activeAttributeName);
 				pointcloud.material.disableEvents();
@@ -170,7 +170,7 @@ export class EDLRenderer{
 
 			this.shadowMap.render(viewer.scene.scenePointCloud, camera);
 
-			for(let pointcloud of visiblePointClouds){
+			for (let pointcloud of visiblePointClouds) {
 				let originalAttribute = originalAttributes.get(pointcloud);
 				// TODO IMPORTANT !!! check
 				pointcloud.material.activeAttributeName = originalAttribute;
@@ -184,38 +184,38 @@ export class EDLRenderer{
 
 	}
 
-	render(params){
+	render(params) {
 		this.initEDL();
 
 		const viewer = this.viewer;
 		let camera = params.camera ? params.camera : viewer.scene.getActiveCamera();
-		const {width, height} = this.viewer.renderer.getSize(new THREE.Vector2());
+		const { width, height } = this.viewer.renderer.getSize(new THREE.Vector2());
 
 
-		viewer.dispatchEvent({type: "render.pass.begin",viewer: viewer});
-		
+		viewer.dispatchEvent({ type: "render.pass.begin", viewer: viewer });
+
 		this.resize(width, height);
 
 		const visiblePointClouds = viewer.scene.pointclouds.filter(pc => pc.visible);
 
-		if(this.screenshot){
+		if (this.screenshot) {
 			let oldBudget = Potree.pointBudget;
 			Potree.pointBudget = Math.max(10 * 1000 * 1000, 2 * oldBudget);
 			let result = Potree.updatePointClouds(
-				viewer.scene.pointclouds, 
-				camera, 
+				viewer.scene.pointclouds,
+				camera,
 				viewer.renderer);
 			Potree.pointBudget = oldBudget;
 		}
 
 		let lights = [];
 		viewer.scene.scene.traverse(node => {
-			if(node.type === "SpotLight"){
+			if (node.type === "SpotLight") {
 				lights.push(node);
 			}
 		});
 
-		if(viewer.background === "skybox"){
+		if (viewer.background === "skybox") {
 			viewer.skybox.camera.rotation.copy(viewer.scene.cameraP.rotation);
 			viewer.skybox.camera.fov = viewer.scene.cameraP.fov;
 			viewer.skybox.camera.aspect = viewer.scene.cameraP.aspect;
@@ -227,7 +227,7 @@ export class EDLRenderer{
 			viewer.renderer.render(viewer.skybox.scene, viewer.skybox.camera);
 		} else if (viewer.background === 'gradient') {
 			viewer.renderer.render(viewer.scene.sceneBG, viewer.scene.cameraBG);
-		} 
+		}
 
 		//TODO adapt to multiple lights
 		this.renderShadowMap(visiblePointClouds, camera, lights);
@@ -247,19 +247,19 @@ export class EDLRenderer{
 				material.uniforms.octreeSize.value = octreeSize;
 				material.spacing = pointcloud.pcoGeometry.spacing; // * Math.max(pointcloud.scale.x, pointcloud.scale.y, pointcloud.scale.z);
 			}
-			
+
 			// TODO adapt to multiple lights
 			viewer.renderer.setRenderTarget(this.rtEDL);
-			
-			if(lights.length > 0){
+
+			if (lights.length > 0) {
 				viewer.pRenderer.render(viewer.scene.scenePointCloud, camera, this.rtEDL, {
 					clipSpheres: viewer.scene.volumes.filter(v => (v instanceof SphereVolume)),
 					shadowMaps: [this.shadowMap],
 					transparent: false,
 				});
-			}else{
+			} else {
 
-				
+
 				// let test = camera.clone();
 				// test.matrixAutoUpdate = false;
 
@@ -280,7 +280,7 @@ export class EDLRenderer{
 				//test.matrixWorld.multiply(mat);
 				//test.matrixWorldInverse.invert(test.matrixWorld);
 				//test.matrixWorldInverse.multiplyMatrices(test.matrixWorldInverse, mat);
-				
+
 
 				viewer.pRenderer.render(viewer.scene.scenePointCloud, camera, this.rtEDL, {
 					clipSpheres: viewer.scene.volumes.filter(v => (v instanceof SphereVolume)),
@@ -288,10 +288,10 @@ export class EDLRenderer{
 				});
 			}
 
-			
+
 		}
 
-		viewer.dispatchEvent({type: "render.pass.scene", viewer: viewer, renderTarget: this.rtRegular});
+		viewer.dispatchEvent({ type: "render.pass.scene", viewer: viewer, renderTarget: this.rtRegular });
 		viewer.renderer.setRenderTarget(null);
 		viewer.renderer.render(viewer.scene.scene, camera);
 
@@ -315,28 +315,44 @@ export class EDLRenderer{
 			uniforms.edlStrength.value = viewer.edlStrength;
 			uniforms.radius.value = viewer.edlRadius;
 			uniforms.opacity.value = viewer.edlOpacity; // HACK
-			
+
 			Utils.screenPass.render(viewer.renderer, this.edlMaterial);
 
-			if(this.screenshot){
+			if (this.screenshot) {
 				Utils.screenPass.render(viewer.renderer, this.edlMaterial, this.screenshot.target);
 			}
 
 		}
+		{
+			const width = viewer.renderer.domElement.clientWidth;
+			const height = viewer.renderer.domElement.clientHeight;
 
-		viewer.dispatchEvent({type: "render.pass.scene", viewer: viewer});
+			const oldViewport = new THREE.Vector4();
+			viewer.renderer.getViewport(oldViewport);
+
+			viewer.renderer.setViewport(
+				width - viewer.navigationCube.width,
+				height - viewer.navigationCube.width,
+				viewer.navigationCube.width,
+				viewer.navigationCube.width
+			);
+			viewer.renderer.render(viewer.navigationCube, viewer.navigationCube.camera);
+
+			viewer.renderer.setViewport(oldViewport);
+		}
+		viewer.dispatchEvent({ type: "render.pass.scene", viewer: viewer });
 
 		viewer.renderer.clearDepth();
 
 		viewer.transformationTool.update();
 
-		viewer.dispatchEvent({type: "render.pass.perspective_overlay",viewer: viewer});
+		viewer.dispatchEvent({ type: "render.pass.perspective_overlay", viewer: viewer });
 
 		viewer.renderer.render(viewer.controls.sceneControls, camera);
 		viewer.renderer.render(viewer.clippingTool.sceneVolume, camera);
 		viewer.renderer.render(viewer.transformationTool.scene, camera);
-		
-		viewer.dispatchEvent({type: "render.pass.end",viewer: viewer});
+
+		viewer.dispatchEvent({ type: "render.pass.end", viewer: viewer });
 
 	}
 }

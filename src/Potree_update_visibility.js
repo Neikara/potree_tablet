@@ -121,8 +121,8 @@ export function updateVisibility(pointclouds, camera, renderer){
 
 	let loadedToGPUThisFrame = 0;
 	
-	let domWidth = renderer.domElement.clientWidth;
-	let domHeight = renderer.domElement.clientHeight;
+	let domWidth  = renderer._vrScreenWidth  || renderer.domElement.clientWidth;
+	let domHeight = renderer._vrScreenHeight || renderer.domElement.clientHeight;
 
 	// check if pointcloud has been transformed
 	// some code will only be executed if changes have been detected

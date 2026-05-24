@@ -79,12 +79,12 @@ export class GeoControls extends EventDispatcher{
 		let endEvent = { type: 'end' };
 
 		this.domElement.addEventListener('contextmenu', (event) => { event.preventDefault(); }, false);
-		this.domElement.addEventListener('mousedown', this.onMouseDown.bind(this), false);
+		this.domElement.addEventListener('pointerdown', this.onMouseDown.bind(this), false);
 		this.domElement.addEventListener('mousewheel', this.onMouseWheel.bind(this), false);
 		this.domElement.addEventListener('DOMMouseScroll', this.onMouseWheel.bind(this), false); // firefox
 
-		this.domElement.addEventListener('mousemove', this.onMouseMove.bind(this), false);
-		this.domElement.addEventListener('mouseup', this.onMouseUp.bind(this), false);
+		this.domElement.addEventListener('pointermove', this.onMouseMove.bind(this), false);
+		this.domElement.addEventListener('pointerup', this.onMouseUp.bind(this), false);
 
 		if (this.domElement.tabIndex === -1) {
 			this.domElement.tabIndex = 2222;
@@ -487,4 +487,3 @@ export class GeoControls extends EventDispatcher{
 		}
 	}
 }
-

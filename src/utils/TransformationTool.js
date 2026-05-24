@@ -163,7 +163,7 @@ export class TransformationTool {
 			pickSphere.addEventListener("drag", (e) => this.dragScaleHandle(e));
 			pickSphere.addEventListener("drop", (e) => this.dropScaleHandle(e));
 
-			pickSphere.addEventListener("mouseover", e => {
+			pickSphere.addEventListener("pointerover", e => {
 				//node.setOpacity(1);
 			});
 
@@ -171,7 +171,7 @@ export class TransformationTool {
 				e.consume();
 			});
 
-			pickSphere.addEventListener("mouseleave", e => {
+			pickSphere.addEventListener("pointerleave", e => {
 				//node.setOpacity(0.4);
 			});
 		}
@@ -265,11 +265,11 @@ export class TransformationTool {
 
 			pickSphere.addEventListener("drag", e => {});
 
-			pickSphere.addEventListener("mouseup", e => {
+			pickSphere.addEventListener("pointerup", e => {
 				e.consume();
 			});
 
-			pickSphere.addEventListener("mousedown", e => {
+			pickSphere.addEventListener("pointerdown", e => {
 				e.consume();
 			});
 
@@ -288,11 +288,11 @@ export class TransformationTool {
 				Utils.moveTo(this.viewer.scene, newCamPos, newCamTarget);
 			});
 
-			pickSphere.addEventListener("mouseover", e => {
+			pickSphere.addEventListener("pointerover", e => {
 				//box.setOpacity(1);
 			});
 
-			pickSphere.addEventListener("mouseleave", e => {
+			pickSphere.addEventListener("pointerleave", e => {
 				//box.setOpacity(0.4);
 			});
 		}

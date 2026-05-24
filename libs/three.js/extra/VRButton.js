@@ -68,6 +68,9 @@ class VRButton {
 			function onSessionEnded( /*event*/ ) {
 
 				currentSession.removeEventListener( 'end', onSessionEnded );
+				if (currentSession) {
+					currentSession.removeEventListener( 'end', onSessionEnded );
+				}
 
 				for(let listener of button.onEndListeners){
 					listener();

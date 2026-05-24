@@ -302,7 +302,19 @@ export class Measure extends THREE.Object3D {
 		this.sphereGeometry = new THREE.SphereGeometry(0.4, 10, 10);
 		this.color = new THREE.Color(0xff0000);
 
+        this.isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+        if (this.isTouchDevice) {
+            this.touchGeometry = new THREE.SphereGeometry(1, 8, 8);
+            this.touchMaterial = new THREE.MeshBasicMaterial({
+                transparent: true,
+                opacity: 0.0,
+                depthTest: false,
+                depthWrite: false,
+            });
+        }
+
 		this.spheres = [];
+		this.touchSpheres = [];
 		this.edges = [];
 		this.sphereLabels = [];
 		this.edgeLabels = [];
@@ -349,12 +361,23 @@ export class Measure extends THREE.Object3D {
 			point = {position: new THREE.Vector3(...point)};
 		}
 		this.points.push(point);
-
+		let touchSphere = null;
 		// sphere
-		let sphere = new THREE.Mesh(this.sphereGeometry, this.createSphereMaterial());
-
+		const sphere = new THREE.Mesh(this.sphereGeometry, this.createSphereMaterial());
+		sphere.position.copy(point.position); // On place la sphère au bon endroit
 		this.add(sphere);
 		this.spheres.push(sphere);
+
+		if (this.isTouchDevice) {
+		    touchSphere = new THREE.Mesh(this.touchGeometry, this.touchMaterial);
+		    touchSphere.name = 'measure_touch_sphere';
+			touchSphere.position.copy(point.position);
+		    this.add(touchSphere);
+		    this.touchSpheres.push(touchSphere);
+		} else {
+            // On garde les index synchronisés
+            this.touchSpheres.push(null);
+        }
 
 		{ // edges
 			let lineGeometry = new LineGeometry();
@@ -413,17 +436,20 @@ export class Measure extends THREE.Object3D {
 			this.add(coordinateLabel);
 		}
 
-		{ // Event Listeners
+		{ // Event Listeners (touch target sphere)
 			let drag = (e) => {
 				let I = Utils.getMousePointCloudIntersection(
-					e.drag.end, 
-					e.viewer.scene.getActiveCamera(), 
-					e.viewer, 
+					e.drag.end,
+					e.viewer.scene.getActiveCamera(),
+					e.viewer,
 					e.viewer.scene.pointclouds,
 					{pickClipped: true});
 
 				if (I) {
 					let i = this.spheres.indexOf(e.drag.object);
+					if (i === -1) {
+						i = this.touchSpheres.indexOf(e.drag.object);
+					}
 					if (i !== -1) {
 						let point = this.points[i];
 						
@@ -445,6 +471,9 @@ export class Measure extends THREE.Object3D {
 
 			let drop = e => {
 				let i = this.spheres.indexOf(e.drag.object);
+				if (i === -1) {
+					i = this.touchSpheres.indexOf(e.drag.object);
+				}
 				if (i !== -1) {
 					this.dispatchEvent({
 						'type': 'marker_dropped',
@@ -453,10 +482,14 @@ export class Measure extends THREE.Object3D {
 					});
 				}
 			};
-
 			let mouseover = (e) => e.object.material.emissive.setHex(0x888888);
 			let mouseleave = (e) => e.object.material.emissive.setHex(0x000000);
-
+			if (touchSphere) {
+				touchSphere.addEventListener('drag', drag);
+		    	touchSphere.addEventListener('drop', drop);
+		    	touchSphere.addEventListener('mouseover', mouseover);
+		    	touchSphere.addEventListener('mouseleave', mouseleave);
+			}
 			sphere.addEventListener('drag', drag);
 			sphere.addEventListener('drop', drop);
 			sphere.addEventListener('mouseover', mouseover);
@@ -481,6 +514,11 @@ export class Measure extends THREE.Object3D {
 		let edgeIndex = (index === 0) ? 0 : (index - 1);
 		this.remove(this.edges[edgeIndex]);
 		this.edges.splice(edgeIndex, 1);
+
+		if (this.touchSpheres[index]) {
+			this.remove(this.touchSpheres[index]);
+			this.touchSpheres.splice(index, 1);
+}
 
 		this.remove(this.edgeLabels[edgeIndex]);
 		this.edgeLabels.splice(edgeIndex, 1);
@@ -610,6 +648,9 @@ export class Measure extends THREE.Object3D {
 			let point = this.points[0];
 			let position = point.position;
 			this.spheres[0].position.copy(position);
+			if (this.touchSpheres && this.touchSpheres[0]) {
+				this.touchSpheres[0].position.copy(position);
+			}
 
 			{ // coordinate labels
 				let coordinateLabel = this.coordinateLabels[0];

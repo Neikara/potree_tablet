@@ -41,20 +41,21 @@ export class InputHandler extends EventDispatcher {
 		if (this.domElement.tabIndex === -1) {
 			this.domElement.tabIndex = 2222;
 		}
+		this._onPointerDown = this.onPointerDown.bind(this);
+        this._onPointerUp = this.onPointerUp.bind(this);
+        this._onPointerMove = this.onPointerMove.bind(this);
 
 		this.domElement.addEventListener('contextmenu', (event) => { event.preventDefault(); }, false);
 		this.domElement.addEventListener('click', this.onMouseClick.bind(this), false);
-		this.domElement.addEventListener('mousedown', this.onMouseDown.bind(this), false);
-		this.domElement.addEventListener('mouseup', this.onMouseUp.bind(this), false);
-		this.domElement.addEventListener('mousemove', this.onMouseMove.bind(this), false);
+		this.domElement.addEventListener('pointerdown', this._onPointerDown, false);
+		this.domElement.addEventListener('pointerup', this._onPointerUp, false);
+		this.domElement.addEventListener('pointercancel', this._onPointerUp, false);
+		this.domElement.addEventListener('pointermove', this._onPointerMove, false);
 		this.domElement.addEventListener('mousewheel', this.onMouseWheel.bind(this), false);
 		this.domElement.addEventListener('DOMMouseScroll', this.onMouseWheel.bind(this), false); // Firefox
 		this.domElement.addEventListener('dblclick', this.onDoubleClick.bind(this));
 		this.domElement.addEventListener('keydown', this.onKeyDown.bind(this));
 		this.domElement.addEventListener('keyup', this.onKeyUp.bind(this));
-		this.domElement.addEventListener('touchstart', this.onTouchStart.bind(this));
-		this.domElement.addEventListener('touchend', this.onTouchEnd.bind(this));
-		this.domElement.addEventListener('touchmove', this.onTouchMove.bind(this));
 	}
 
 	addInputListener (listener) {
@@ -72,105 +73,6 @@ export class InputHandler extends EventDispatcher {
 
 			return ib - ia;
 		});
-	}
-
-	onTouchStart (e) {
-		if (this.logMessages) console.log(this.constructor.name + ': onTouchStart');
-
-		e.preventDefault();
-
-		if (e.touches.length === 1) {
-			let rect = this.domElement.getBoundingClientRect();
-			let x = e.touches[0].pageX - rect.left;
-			let y = e.touches[0].pageY - rect.top;
-			this.mouse.set(x, y);
-
-			this.startDragging(null);
-		}
-
-		
-		for (let inputListener of this.getSortedListeners()) {
-			inputListener.dispatchEvent({
-				type: e.type,
-				touches: e.touches,
-				changedTouches: e.changedTouches
-			});
-		}
-	}
-
-	onTouchEnd (e) {
-		if (this.logMessages) console.log(this.constructor.name + ': onTouchEnd');
-
-		e.preventDefault();
-
-		for (let inputListener of this.getSortedListeners()) {
-			inputListener.dispatchEvent({
-				type: 'drop',
-				drag: this.drag,
-				viewer: this.viewer
-			});
-		}
-
-		this.drag = null;
-
-		for (let inputListener of this.getSortedListeners()) {
-			inputListener.dispatchEvent({
-				type: e.type,
-				touches: e.touches,
-				changedTouches: e.changedTouches
-			});
-		}
-	}
-
-	onTouchMove (e) {
-		if (this.logMessages) console.log(this.constructor.name + ': onTouchMove');
-
-		e.preventDefault();
-
-		if (e.touches.length === 1) {
-			let rect = this.domElement.getBoundingClientRect();
-			let x = e.touches[0].pageX - rect.left;
-			let y = e.touches[0].pageY - rect.top;
-			this.mouse.set(x, y);
-
-			if (this.drag) {
-				this.drag.mouse = 1;
-
-				this.drag.lastDrag.x = x - this.drag.end.x;
-				this.drag.lastDrag.y = y - this.drag.end.y;
-
-				this.drag.end.set(x, y);
-
-				if (this.logMessages) console.log(this.constructor.name + ': drag: ');
-				for (let inputListener of this.getSortedListeners()) {
-					inputListener.dispatchEvent({
-						type: 'drag',
-						drag: this.drag,
-						viewer: this.viewer
-					});
-				}
-			}
-		}
-
-		for (let inputListener of this.getSortedListeners()) {
-			inputListener.dispatchEvent({
-				type: e.type,
-				touches: e.touches,
-				changedTouches: e.changedTouches
-			});
-		}
-
-		// DEBUG CODE
-		// let debugTouches = [...e.touches, {
-		//	pageX: this.domElement.clientWidth / 2,
-		//	pageY: this.domElement.clientHeight / 2}];
-		// for(let inputListener of this.getSortedListeners()){
-		//	inputListener.dispatchEvent({
-		//		type: e.type,
-		//		touches: debugTouches,
-		//		changedTouches: e.changedTouches
-		//	});
-		// }
 	}
 
 	onKeyDown (e) {
@@ -248,17 +150,42 @@ export class InputHandler extends EventDispatcher {
 		e.preventDefault();
 	}
 
-	onMouseDown (e) {
-		if (this.logMessages) console.log(this.constructor.name + ': onMouseDown');
+	onPointerDown (e) {
+		if (this.logMessages) console.log(this.constructor.name + ': onPointerDown');
+		
+		try {
+				this.domElement.setPointerCapture(e.pointerId);
+			} catch (err) {
+				console.warn("Impossible de capturer le pointeur", err);
+			}
 
 		e.preventDefault();
 
+		let rect = this.domElement.getBoundingClientRect();
+		let x = e.clientX - rect.left;
+		let y = e.clientY - rect.top;
+		
+		if(isFinite(x) && isFinite(y)){
+			this.mouse.set(x, y);
+		}
 		let consumed = false;
 		let consume = () => { return consumed = true; };
+		let isEditMode = this.viewer.measuringTool && this.viewer.measuringTool.editMode;
+		const isOverCube = this._isPointerOverNavigationCube(e);
+
+		if (isEditMode) {
+			if (isOverCube) {
+				// Zone cube de navigation : on efface les hoveredElements pour que
+				// les contrôles caméra reçoivent l'événement et non les points de mesure
+				this.hoveredElements = [];
+			} else {
+				this.hoveredElements = this.getHoveredElements();
+			}
+		}
 		if (this.hoveredElements.length === 0) {
 			for (let inputListener of this.getSortedListeners()) {
 				inputListener.dispatchEvent({
-					type: 'mousedown',
+					type: 'pointerdown',
 					viewer: this.viewer,
 					mouse: this.mouse
 				});
@@ -267,7 +194,7 @@ export class InputHandler extends EventDispatcher {
 			for(let hovered of this.hoveredElements){
 				let object = hovered.object;
 				object.dispatchEvent({
-					type: 'mousedown',
+					type: 'pointerdown',
 					viewer: this.viewer,
 					consume: consume
 				});
@@ -288,7 +215,9 @@ export class InputHandler extends EventDispatcher {
 			if (target) {
 				this.startDragging(target.object, {location: target.point});
 			} else {
-				this.startDragging(null);
+				if (!isEditMode || isOverCube) {
+					this.startDragging(null);
+				}
 			}
 		}
 
@@ -297,10 +226,13 @@ export class InputHandler extends EventDispatcher {
 		}
 	}
 
-	onMouseUp (e) {
-		if (this.logMessages) console.log(this.constructor.name + ': onMouseUp');
+	onPointerUp (e) {
+		if (this.logMessages) console.log(this.constructor.name + ': onPointerUp');
 
 		e.preventDefault();
+		try {
+        	this.domElement.releasePointerCapture(e.pointerId);
+    	} catch (e) {}
 
 		let noMovement = this.getNormalizedDrag().length() === 0;
 
@@ -310,7 +242,7 @@ export class InputHandler extends EventDispatcher {
 		if (this.hoveredElements.length === 0) {
 			for (let inputListener of this.getSortedListeners()) {
 				inputListener.dispatchEvent({
-					type: 'mouseup',
+					type: 'pointerup',
 					viewer: this.viewer,
 					mouse: this.mouse,
 					consume: consume
@@ -323,12 +255,13 @@ export class InputHandler extends EventDispatcher {
 		}else{
 			let hovered = this.hoveredElements
 				.map(e => e.object)
-				.find(e => (e._listeners && e._listeners['mouseup']));
+				.find(e => (e._listeners && e._listeners['pointerup']));
 			if(hovered){
 				hovered.dispatchEvent({
-					type: 'mouseup',
+					type: 'pointerup',
 					viewer: this.viewer,
-					consume: consume
+					consume: consume,
+					event: e
 				});
 			}
 		}
@@ -393,14 +326,16 @@ export class InputHandler extends EventDispatcher {
 		}
 	}
 
-	onMouseMove (e) {
+	onPointerMove (e) {
 		e.preventDefault();
 
 		let rect = this.domElement.getBoundingClientRect();
 		let x = e.clientX - rect.left;
 		let y = e.clientY - rect.top;
 		this.mouse.set(x, y);
-
+		if (this.logMessages) {
+        	console.log(`Mouse Move: x=${x.toFixed(2)}, y=${y.toFixed(2)} | Dragging: ${!!this.drag}`);
+    	}
 		let hoveredElements = this.getHoveredElements();
 		if(hoveredElements.length > 0){
 			let names = hoveredElements.map(h => h.object.name).join(", ");
@@ -445,16 +380,16 @@ export class InputHandler extends EventDispatcher {
 
 			if(curr !== prev){
 				if(curr){
-					if (this.logMessages) console.log(`${this.constructor.name}: mouseover: ${curr.name}`);
+					if (this.logMessages) console.log(`${this.constructor.name}: pointerover: ${curr.name}`);
 					curr.dispatchEvent({
-						type: 'mouseover',
+						type: 'pointerover',
 						object: curr,
 					});
 				}
 				if(prev){
-					if (this.logMessages) console.log(`${this.constructor.name}: mouseleave: ${prev.name}`);
+					if (this.logMessages) console.log(`${this.constructor.name}: pointerleave: ${prev.name}`);
 					prev.dispatchEvent({
-						type: 'mouseleave',
+						type: 'pointerleave',
 						object: prev,
 					});
 				}
@@ -463,12 +398,13 @@ export class InputHandler extends EventDispatcher {
 			if(hoveredElements.length > 0){
 				let object = hoveredElements
 					.map(e => e.object)
-					.find(e => (e._listeners && e._listeners['mousemove']));
+					.find(e => (e._listeners && e._listeners['pointermove']));
 				
 				if(object){
 					object.dispatchEvent({
-						type: 'mousemove',
-						object: object
+						type: 'pointermove',
+						object: object,
+						event: e
 					});
 				}
 			}
@@ -539,6 +475,15 @@ export class InputHandler extends EventDispatcher {
 				this.drag[key] = args[key];
 			}
 		}
+	}
+
+	_isPointerOverNavigationCube(e) {
+		const cube = this.viewer.navigationCube;
+		if (!cube || !cube.visible) return false;
+		// Même logique de coordonnées que NavigationCube.onMouseDown
+		const x = e.clientX - (window.innerWidth - cube.width);
+		const y = e.clientY;
+		return x >= 0 && y <= cube.width;
 	}
 
 	getMousePointCloudIntersection (mouse) {
@@ -652,7 +597,10 @@ export class InputHandler extends EventDispatcher {
 	getHoveredElements () {
 		let scenes = this.interactiveScenes.concat(this.scene.scene);
 
-		let interactableListeners = ['mouseup', 'mousemove', 'mouseover', 'mouseleave', 'drag', 'drop', 'click', 'select', 'deselect'];
+		let interactableListeners = [
+			'pointerup', 'pointermove', 'pointerover', 'pointerleave',
+			'drag', 'drop', 'click', 'select', 'deselect'
+		];		
 		let interactables = [];
 		for (let scene of scenes) {
 			scene.traverseVisible(node => {

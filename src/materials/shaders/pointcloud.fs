@@ -69,7 +69,9 @@ void main() {
 		pos = pos / pos.w;
 		float expDepth = pos.z;
 		depth = (pos.z + 1.0) / 2.0;
-		gl_FragDepthEXT = depth;
+		#if defined(GL_EXT_frag_depth)
+			gl_FragDepthEXT = depth;
+		#endif
 		
 		#if defined(color_type_depth)
 			color.r = linearDepth;

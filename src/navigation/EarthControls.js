@@ -152,8 +152,8 @@ export class EarthControls extends EventDispatcher {
 		this.addEventListener('drag', drag);
 		this.addEventListener('drop', drop);
 		this.addEventListener('mousewheel', scroll);
-		this.addEventListener('mousedown', onMouseDown);
-		this.addEventListener('mouseup', onMouseUp);
+		this.addEventListener('pointerdown', onMouseDown);
+		this.addEventListener('pointerup', onMouseUp);
 		this.addEventListener('dblclick', dblclick);
 	}
 
