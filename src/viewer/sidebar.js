@@ -31,6 +31,71 @@ export class Sidebar{
 		this.dom = $("#sidebar_root");
 	}
 
+	setEditMode(active) {
+        if (this.measuringTool) this.measuringTool.editMode = active;
+        if (this.profileTool) this.profileTool.editMode = active;
+    }
+
+	installTouchFix(slider){
+		slider.find('.ui-slider-handle').each(function(handleIndex) {
+			const handle = this;
+			handle.addEventListener('pointerdown', function(e) {
+				if (e.pointerType === 'mouse') return; // PC mouse
+
+				e.preventDefault();
+				e.stopPropagation();
+				handle.setPointerCapture(e.pointerId);
+
+				const track    = slider[0];
+				const min      = slider.slider('option', 'min');
+				const max      = slider.slider('option', 'max');
+				const step     = slider.slider('option', 'step');
+				const isRange  = slider.slider('option', 'range') === true;
+				const slideCb  = slider.slider('option', 'slide');
+
+				function updateValue(clientX) {
+					const rect  = track.getBoundingClientRect();
+					const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+					let value   = min + ratio * (max - min);
+					value       = Math.round(value / step) * step;
+
+					if (isRange) {
+						slider.slider('values', handleIndex, value);
+						if (slideCb) slideCb(e, { values: slider.slider('values'), value });
+					} else {
+						slider.slider('value', value);
+						if (slideCb) slideCb(e, { value });
+					}
+				}
+
+				function onMove(ev) { updateValue(ev.clientX); }
+				function onUp()     {
+					handle.removeEventListener('pointermove', onMove);
+					handle.removeEventListener('pointerup',   onUp);
+				}
+
+				handle.addEventListener('pointermove', onMove);
+				handle.addEventListener('pointerup',   onUp);
+			});
+		});
+	}
+
+	selectInTree(uuid){
+		let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
+		let annotationsRoot = $("#jstree_scene").jstree().get_json("annotations");
+
+		// Search in measurements or annotations
+		let jsonNode = measurementsRoot.children.find(child => child.data.uuid === uuid);
+		if(!jsonNode && annotationsRoot){
+			jsonNode = annotationsRoot.children.find(child => child.data.uuid === uuid);
+		}
+
+		if(jsonNode){
+			$.jstree.reference(jsonNode.id).deselect_all();
+			$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+		}
+	}
+
 	createToolIcon(icon, title, callback){
 		let element = $(`
 			<img src="${icon}"
@@ -77,10 +142,7 @@ export class Sidebar{
 					maxMarkers: 3,
 					name: 'Angle'});
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(measurement.uuid);
 			}
 		));
 
@@ -97,12 +159,10 @@ export class Sidebar{
 					showArea: false,
 					closed: true,
 					maxMarkers: 1,
-					name: 'Point'});
+					name: 'Point'
+				});
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(measurement.uuid);
 			}
 		));
 
@@ -118,10 +178,7 @@ export class Sidebar{
 					closed: false,
 					name: 'Distance'});
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(measurement.uuid);
 			}
 		));
 
@@ -139,10 +196,7 @@ export class Sidebar{
 					maxMarkers: 2,
 					name: 'Height'});
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(measurement.uuid);
 			}
 		));
 
@@ -162,10 +216,7 @@ export class Sidebar{
 					maxMarkers: 3,
 					name: 'Circle'});
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(measurement.uuid);
 			}
 		));
 
@@ -186,10 +237,7 @@ export class Sidebar{
 					maxMarkers: 2,
 					name: 'Azimuth'});
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(measurement.uuid);
 			}
 		));
 
@@ -205,10 +253,7 @@ export class Sidebar{
 					closed: true,
 					name: 'Area'});
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(measurement.uuid);
 			}
 		));
 
@@ -219,10 +264,7 @@ export class Sidebar{
 			() => {
 				let volume = this.volumeTool.startInsertion(); 
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === volume.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(volume.uuid);
 			}
 		));
 
@@ -233,10 +275,7 @@ export class Sidebar{
 			() => { 
 				let volume = this.volumeTool.startInsertion({type: SphereVolume}); 
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === volume.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(volume.uuid);
 			}
 		));
 
@@ -245,13 +284,10 @@ export class Sidebar{
 			Potree.resourcePath + '/icons/profile.svg',
 			'[title]tt.height_profile',
 			() => {
-				$('#menu_measurements').next().slideDown(); ;
+				$('#menu_measurements').next().slideDown();
 				let profile = this.profileTool.startInsertion();
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === profile.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(profile.uuid);
 			}
 		));
 
@@ -263,12 +299,44 @@ export class Sidebar{
 				$('#menu_measurements').next().slideDown(); ;
 				let annotation = this.viewer.annotationTool.startInsertion();
 
-				let annotationsRoot = $("#jstree_scene").jstree().get_json("annotations");
-				let jsonNode = annotationsRoot.children.find(child => child.data.uuid === annotation.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(annotation.uuid);
 			}
 		));
+	
+		// EDIT MODE
+		if (this.viewer.isTablet && this.measuringTool && this.profileTool) {
+			// Création du bouton
+			let el = this.createToolIcon(
+				Potree.resourcePath + '/icons/edit_mode.svg',
+				'Edit Mode',
+				() => this.setEditMode(!this.measuringTool.editMode)
+			);
+
+			// Fonction unique et simplifiée pour l'apparence
+			const updateIconAppearance = () => {
+				const isActive = this.measuringTool.editMode || this.profileTool.editMode;
+
+				el.toggleClass('active-custom', isActive);
+				el.css({
+					"background-color": isActive ? "rgba(255, 255, 255, 0.5)" : "",
+					"filter": isActive ? "invert(1)" : ""
+				});
+
+				if (!isActive) this.viewer.dispatchEvent({ type: "cancel_insertions" });
+			};
+
+			// Abonnement aux deux outils
+			[this.measuringTool, this.profileTool].forEach(tool => {
+				tool.addEventListener("edit_mode_changed", updateIconAppearance);
+			});
+
+			// Insertion au DOM
+			$('<div id="potree_edit_mode_container" style="position: absolute; z-index: 10000; bottom: 50px; right: 10px; background: rgba(255, 255, 255, 0.6); padding: 4px; border-radius: 4px; display: flex;">')
+				.append(el)
+				.appendTo(this.viewer.renderArea);
+
+			updateIconAppearance();
+		}
 
 		// REMOVE ALL
 		elToolbar.append(this.createToolIcon(
@@ -276,23 +344,22 @@ export class Sidebar{
 			'[title]tt.remove_all_measurement',
 			() => {
 				this.viewer.scene.removeAllMeasurements();
+				this.setEditMode(false); // Utilise la même fonction de synchronisation
 			}
 		));
 
-
 		{ // SHOW / HIDE Measurements
 			let elShow = $("#measurement_options_show");
-			elShow.selectgroup({title: "Show/Hide labels"});
-
-			elShow.find("input").click( (e) => {
-				const show = e.target.value === "SHOW";
+			// native select
+			elShow.change((e) => {
+				const show = e.target.value === "SHOW";s
 				this.measuringTool.showLabels = show;
 			});
-
 			let currentShow = this.measuringTool.showLabels ? "SHOW" : "HIDE";
-			elShow.find(`input[value=${currentShow}]`).trigger("click");
+			elShow.val(currentShow);
 		}
 	}
+
 
 	initScene(){
 
@@ -339,7 +406,7 @@ export class Sidebar{
 				if(measurements.length > 0){
 					let dxf = DXFExporter.toString(measurements);
 
-					let url = window.URL.createObjectURL(new Blob([dxf], {type: 'data:application/octet-stream'}));
+					let url = window.URL.createObjectURL(new Blob([dxf], { type: 'data:application/octet-stream' }));
 					elDownloadDXF.attr('href', url);
 				}else{
 					this.viewer.postError("no measurements to export");
@@ -371,7 +438,7 @@ export class Sidebar{
 			'core': {
 				"dblclick_toggle": false,
 				"state": {
-					"checked" : true
+					"checked": true
 				},
 				'check_callback': true,
 				"expand_selected_onload": true
@@ -394,14 +461,14 @@ export class Sidebar{
 			
 			if(object.visible){
 				tree.jstree('check_node', nodeID);
-			}else{
+			} else {
 				tree.jstree('uncheck_node', nodeID);
 			}
 
 			return nodeID;
 		}
 
-		let pcID = tree.jstree('create_node', "#", { "text": "<b>Point Clouds</b>", "id": "pointclouds"}, "last", false, false);
+		let pcID = tree.jstree('create_node', "#", { "text": "<b>Point Clouds</b>", "id": "pointclouds" }, "last", false, false);
 		let measurementID = tree.jstree('create_node', "#", { "text": "<b>Measurements</b>", "id": "measurements" }, "last", false, false);
 		let annotationsID = tree.jstree('create_node', "#", { "text": "<b>Annotations</b>", "id": "annotations" }, "last", false, false);
 		let otherID = tree.jstree('create_node', "#", { "text": "<b>Other</b>", "id": "other" }, "last", false, false);
@@ -425,7 +492,7 @@ export class Sidebar{
 
 			this.viewer.inputHandler.deselectAll();
 
-			if(object instanceof Volume){
+			if (object instanceof Volume) {
 				this.viewer.inputHandler.toggleSelection(object);
 			}
 
@@ -447,76 +514,76 @@ export class Sidebar{
 			let object = node.data;
 
 			// ignore double click on checkbox
-			if(e.target.classList.contains("jstree-checkbox")){
+			if (e.target.classList.contains("jstree-checkbox")) {
 				return;
 			}
 
-			if(object instanceof PointCloudTree){
+			if (object instanceof PointCloudTree) {
 				let box = this.viewer.getBoundingBox([object]);
 				let node = new THREE.Object3D();
 				node.boundingBox = box;
 				this.viewer.zoomTo(node, 1, 500);
-			}else if(object instanceof Measure){
+			} else if (object instanceof Measure) {
 				let points = object.points.map(p => p.position);
 				let box = new THREE.Box3().setFromPoints(points);
-				if(box.getSize(new THREE.Vector3()).length() > 0){
+				if (box.getSize(new THREE.Vector3()).length() > 0) {
 					let node = new THREE.Object3D();
 					node.boundingBox = box;
 					this.viewer.zoomTo(node, 2, 500);
 				}
-			}else if(object instanceof Profile){
+			} else if (object instanceof Profile) {
 				let points = object.points;
 				let box = new THREE.Box3().setFromPoints(points);
-				if(box.getSize(new THREE.Vector3()).length() > 0){
+				if (box.getSize(new THREE.Vector3()).length() > 0) {
 					let node = new THREE.Object3D();
 					node.boundingBox = box;
 					this.viewer.zoomTo(node, 1, 500);
 				}
-			}else if(object instanceof Volume){
-				
+			} else if (object instanceof Volume) {
+
 				let box = object.boundingBox.clone().applyMatrix4(object.matrixWorld);
 
-				if(box.getSize(new THREE.Vector3()).length() > 0){
+				if (box.getSize(new THREE.Vector3()).length() > 0) {
 					let node = new THREE.Object3D();
 					node.boundingBox = box;
 					this.viewer.zoomTo(node, 1, 500);
 				}
-			}else if(object instanceof Annotation){
+			} else if (object instanceof Annotation) {
 				object.moveHere(this.viewer.scene.getActiveCamera());
-			}else if(object instanceof PolygonClipVolume){
+			} else if (object instanceof PolygonClipVolume) {
 				let dir = object.camera.getWorldDirection(new THREE.Vector3());
 				let target;
 
-				if(object.camera instanceof THREE.OrthographicCamera){
+				if (object.camera instanceof THREE.OrthographicCamera) {
 					dir.multiplyScalar(object.camera.right)
 					target = new THREE.Vector3().addVectors(object.camera.position, dir);
 					this.viewer.setCameraMode(CameraMode.ORTHOGRAPHIC);
-				}else if(object.camera instanceof THREE.PerspectiveCamera){
+				} else if (object.camera instanceof THREE.PerspectiveCamera) {
 					dir.multiplyScalar(this.viewer.scene.view.radius);
 					target = new THREE.Vector3().addVectors(object.camera.position, dir);
 					this.viewer.setCameraMode(CameraMode.PERSPECTIVE);
 				}
-				
+
 				this.viewer.scene.view.position.copy(object.camera.position);
 				this.viewer.scene.view.lookAt(target);
-			}else if(object.type === "SpotLight"){
+			} else if (object.type === "SpotLight") {
 				let distance = (object.distance > 0) ? object.distance / 4 : 5 * 1000;
 				let position = object.position;
 				let target = new THREE.Vector3().addVectors(
-					position, 
+					position,
 					object.getWorldDirection(new THREE.Vector3()).multiplyScalar(distance));
 
 				this.viewer.scene.view.position.copy(object.position);
 				this.viewer.scene.view.lookAt(target);
-			}else if(object instanceof THREE.Object3D){
+			} else if (object instanceof THREE.Object3D) {
 				let box = new THREE.Box3().setFromObject(object);
 
-				if(box.getSize(new THREE.Vector3()).length() > 0){
+				if (box.getSize(new THREE.Vector3()).length() > 0) {
 					let node = new THREE.Object3D();
 					node.boundingBox = box;
 					this.viewer.zoomTo(node, 1, 500);
 				}
-			}else if(object instanceof OrientedImage){
+			} else if (object instanceof OrientedImage) {
 				// TODO zoom to images
 
 				// let box = new THREE.Box3().setFromObject(object);
@@ -526,9 +593,9 @@ export class Sidebar{
 				// 	node.boundingBox = box;
 				// 	this.viewer.zoomTo(node, 1, 500);
 				// }
-			}else if(object instanceof Images360){
+			} else if (object instanceof Images360) {
 				// TODO
-			}else if(object instanceof Geopackage){
+			} else if (object instanceof Geopackage) {
 				// TODO
 			}
 		});
@@ -536,7 +603,7 @@ export class Sidebar{
 		tree.on("uncheck_node.jstree", (e, data) => {
 			let object = data.node.data;
 
-			if(object){
+			if (object) {
 				object.visible = false;
 			}
 		});
@@ -544,7 +611,7 @@ export class Sidebar{
 		tree.on("check_node.jstree", (e, data) => {
 			let object = data.node.data;
 
-			if(object){
+			if (object) {
 				object.visible = true;
 			}
 		});
@@ -556,9 +623,9 @@ export class Sidebar{
 			let node = createNode(pcID, pointcloud.name, cloudIcon, pointcloud);
 
 			pointcloud.addEventListener("visibility_changed", () => {
-				if(pointcloud.visible){
+				if (pointcloud.visible) {
 					tree.jstree('check_node', node);
-				}else{
+				} else {
 					tree.jstree('uncheck_node', node);
 				}
 			});
@@ -576,9 +643,9 @@ export class Sidebar{
 			let node = createNode(measurementID, volume.name, icon, volume);
 
 			volume.addEventListener("visibility_changed", () => {
-				if(volume.visible){
+				if (volume.visible) {
 					tree.jstree('check_node', node);
-				}else{
+				} else {
 					tree.jstree('uncheck_node', node);
 				}
 			});
@@ -601,7 +668,7 @@ export class Sidebar{
 			annotation.addEventListener("annotation_changed", (e) => {
 				let annotationsRoot = $("#jstree_scene").jstree().get_json("annotations");
 				let jsonNode = annotationsRoot.children.find(child => child.data.uuid === annotation.uuid);
-				
+
 				$.jstree.reference(jsonNode.id).rename_node(jsonNode.id, annotation.title);
 			});
 		};
@@ -620,9 +687,9 @@ export class Sidebar{
 			const node = createNode(imagesID, "images", imagesIcon, images);
 
 			images.addEventListener("visibility_changed", () => {
-				if(images.visible){
+				if (images.visible) {
 					tree.jstree('check_node', node);
-				}else{
+				} else {
 					tree.jstree('uncheck_node', node);
 				}
 			});
@@ -635,9 +702,9 @@ export class Sidebar{
 			const node = createNode(imagesID, "360° images", imagesIcon, images);
 
 			images.addEventListener("visibility_changed", () => {
-				if(images.visible){
+				if (images.visible) {
 					tree.jstree('check_node', node);
-				}else{
+				} else {
 					tree.jstree('uncheck_node', node);
 				}
 			});
@@ -650,15 +717,15 @@ export class Sidebar{
 			const tree = $(`#jstree_scene`);
 			const parentNode = "vectors";
 
-			for(const layer of geopackage.node.children){
+			for (const layer of geopackage.node.children) {
 				const name = layer.name;
 
-				let shpPointsID = tree.jstree('create_node', parentNode, { 
-						"text": name, 
-						"icon": geopackageIcon,
-						"object": layer,
-						"data": layer,
-					}, 
+				let shpPointsID = tree.jstree('create_node', parentNode, {
+					"text": name,
+					"icon": geopackageIcon,
+					"object": layer,
+					"data": layer,
+				},
 					"last", false, false);
 				tree.jstree(layer.visible ? "check_node" : "uncheck_node", shpPointsID);
 			}
@@ -679,28 +746,28 @@ export class Sidebar{
 		let onMeasurementRemoved = (e) => {
 			let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
 			let jsonNode = measurementsRoot.children.find(child => child.data.uuid === e.measurement.uuid);
-			
+
 			tree.jstree("delete_node", jsonNode.id);
 		};
 
 		let onVolumeRemoved = (e) => {
 			let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
 			let jsonNode = measurementsRoot.children.find(child => child.data.uuid === e.volume.uuid);
-			
+
 			tree.jstree("delete_node", jsonNode.id);
 		};
 
 		let onPolygonClipVolumeRemoved = (e) => {
 			let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
 			let jsonNode = measurementsRoot.children.find(child => child.data.uuid === e.volume.uuid);
-			
+
 			tree.jstree("delete_node", jsonNode.id);
 		};
 
 		let onProfileRemoved = (e) => {
 			let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
 			let jsonNode = measurementsRoot.children.find(child => child.data.uuid === e.profile.uuid);
-			
+
 			tree.jstree("delete_node", jsonNode.id);
 		};
 
@@ -711,7 +778,7 @@ export class Sidebar{
 
 		{
 			let annotationIcon = `${Potree.resourcePath}/icons/annotation.svg`;
-			this.annotationMapping = new Map(); 
+			this.annotationMapping = new Map();
 			this.annotationMapping.set(this.viewer.scene.annotations, annotationsID);
 			this.viewer.scene.annotations.traverseDescendants(annotation => {
 				let parentID = this.annotationMapping.get(annotation.parent);
@@ -721,36 +788,36 @@ export class Sidebar{
 		}
 
 		const scene = this.viewer.scene;
-		for(let pointcloud of scene.pointclouds){
-			onPointCloudAdded({pointcloud: pointcloud});
+		for (let pointcloud of scene.pointclouds) {
+			onPointCloudAdded({ pointcloud: pointcloud });
 		}
 
-		for(let measurement of scene.measurements){
-			onMeasurementAdded({measurement: measurement});
+		for (let measurement of scene.measurements) {
+			onMeasurementAdded({ measurement: measurement });
 		}
 
-		for(let volume of [...scene.volumes, ...scene.polygonClipVolumes]){
-			onVolumeAdded({volume: volume});
+		for (let volume of [...scene.volumes, ...scene.polygonClipVolumes]) {
+			onVolumeAdded({ volume: volume });
 		}
 
-		for(let animation of scene.cameraAnimations){
-			onCameraAnimationAdded({animation: animation});
+		for (let animation of scene.cameraAnimations) {
+			onCameraAnimationAdded({ animation: animation });
 		}
 
-		for(let images of scene.orientedImages){
-			onOrientedImagesAdded({images: images});
+		for (let images of scene.orientedImages) {
+			onOrientedImagesAdded({ images: images });
 		}
 
-		for(let images of scene.images360){
-			onImages360Added({images: images});
+		for (let images of scene.images360) {
+			onImages360Added({ images: images });
 		}
 
-		for(const geopackage of scene.geopackages){
-			onGeopackageAdded({geopackage: geopackage});
+		for (const geopackage of scene.geopackages) {
+			onGeopackageAdded({ geopackage: geopackage });
 		}
 
-		for(let profile of scene.profiles){
-			onProfileAdded({profile: profile});
+		for (let profile of scene.profiles) {
+			onProfileAdded({ profile: profile });
 		}
 
 		{
@@ -777,7 +844,7 @@ export class Sidebar{
 
 	}
 
-	initClippingTool(){
+	initClippingTool() {
 
 
 		this.viewer.addEventListener("cliptask_changed", (event) => {
@@ -790,28 +857,28 @@ export class Sidebar{
 
 		{
 			let elClipTask = $("#cliptask_options");
-			elClipTask.selectgroup({title: "Clip Task"});
-
-			elClipTask.find("input").click( (e) => {
+			// native select
+			elClipTask.change((e) => {
 				this.viewer.setClipTask(ClipTask[e.target.value]);
 			});
 
 			let currentClipTask = Object.keys(ClipTask)
-				.filter(key => ClipTask[key] === this.viewer.clipTask);
-			elClipTask.find(`input[value=${currentClipTask}]`).trigger("click");
+				.filter(key => ClipTask[key] === this.viewer.clipTask)[0];
+			if (currentClipTask) {
+				elClipTask.val(currentClipTask);
+			}
 		}
 
 		{
 			let elClipMethod = $("#clipmethod_options");
-			elClipMethod.selectgroup({title: "Clip Method"});
-
-			elClipMethod.find("input").click( (e) => {
+			// native select
+			elClipMethod.change((e) => {
 				this.viewer.setClipMethod(ClipMethod[e.target.value]);
 			});
 
 			let currentClipMethod = Object.keys(ClipMethod)
-				.filter(key => ClipMethod[key] === this.viewer.clipMethod);
-			elClipMethod.find(`input[value=${currentClipMethod}]`).trigger("click");
+				.filter(key => ClipMethod[key] === this.viewer.clipMethod)[0];
+			if (currentClipMethod) elClipMethod.val(currentClipMethod);
 		}
 
 		let clippingToolBar = $("#clipping_tools");
@@ -821,12 +888,9 @@ export class Sidebar{
 			Potree.resourcePath + '/icons/clip_volume.svg',
 			'[title]tt.clip_volume',
 			() => {
-				let item = this.volumeTool.startInsertion({clip: true}); 
+				let item = this.volumeTool.startInsertion({ clip: true });
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === item.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(item.uuid);
 			}
 		));
 
@@ -835,12 +899,9 @@ export class Sidebar{
 			Potree.resourcePath + "/icons/clip-polygon.svg",
 			"[title]tt.clip_polygon",
 			() => {
-				let item = this.viewer.clippingTool.startInsertion({type: "polygon"});
+				let item = this.viewer.clippingTool.startInsertion({ type: "polygon" });
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === item.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				this.selectInTree(item.uuid);
 			}
 		));
 
@@ -851,18 +912,15 @@ export class Sidebar{
 				Potree.resourcePath + "/icons/clip-screen.svg",
 				"[title]tt.screen_clip_box",
 				() => {
-					if(!(this.viewer.scene.getActiveCamera() instanceof THREE.OrthographicCamera)){
-						this.viewer.postMessage(`Switch to Orthographic Camera Mode before using the Screen-Box-Select tool.`, 
-							{duration: 2000});
+					if (!(this.viewer.scene.getActiveCamera() instanceof THREE.OrthographicCamera)) {
+						this.viewer.postMessage(`Switch to Orthographic Camera Mode before using the Screen-Box-Select tool.`,
+							{ duration: 2000 });
 						return;
 					}
-					
+
 					let item = boxSelectTool.startInsertion();
 
-					let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-					let jsonNode = measurementsRoot.children.find(child => child.data.uuid === item.uuid);
-					$.jstree.reference(jsonNode.id).deselect_all();
-					$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+					this.selectInTree(item.uuid);
 				}
 			));
 		}
@@ -880,7 +938,7 @@ export class Sidebar{
 
 	}
 
-	initFilters(){
+	initFilters() {
 		this.initClassificationList();
 		this.initReturnFilters();
 		this.initGPSTimeFilters();
@@ -888,7 +946,8 @@ export class Sidebar{
 
 	}
 
-	initReturnFilters(){
+
+	initReturnFilters() {
 		let elReturnFilterPanel = $('#return_filter_panel');
 
 		{ // RETURN NUMBER
@@ -901,14 +960,18 @@ export class Sidebar{
 				values: [0, 7],
 				slide: (event, ui) => {
 					this.viewer.setFilterReturnNumberRange(ui.values[0], ui.values[1])
+				},
+				create: function () {
+					$(this).find('.ui-slider-handle').css('touch-action', 'none');
 				}
 			});
+			this.installTouchFix(sldReturnNumber);
 
 			let onReturnNumberChanged = (event) => {
 				let [from, to] = this.viewer.filterReturnNumberRange;
 
 				lblReturnNumber[0].innerHTML = `${from} to ${to}`;
-				sldReturnNumber.slider({values: [from, to]});
+				sldReturnNumber.slider({ values: [from, to] });
 			};
 
 			this.viewer.addEventListener('filter_return_number_range_changed', onReturnNumberChanged);
@@ -926,14 +989,18 @@ export class Sidebar{
 				values: [0, 7],
 				slide: (event, ui) => {
 					this.viewer.setFilterNumberOfReturnsRange(ui.values[0], ui.values[1])
+				},
+				create: function () {
+					$(this).find('.ui-slider-handle').css('touch-action', 'none');
 				}
 			});
+			this.installTouchFix(sldNumberOfReturns);
 
 			let onNumberOfReturnsChanged = (event) => {
 				let [from, to] = this.viewer.filterNumberOfReturnsRange;
 
 				lblNumberOfReturns[0].innerHTML = `${from} to ${to}`;
-				sldNumberOfReturns.slider({values: [from, to]});
+				sldNumberOfReturns.slider({ values: [from, to] });
 			};
 
 			this.viewer.addEventListener('filter_number_of_returns_range_changed', onNumberOfReturnsChanged);
@@ -942,7 +1009,7 @@ export class Sidebar{
 		}
 	}
 
-	initGPSTimeFilters(){
+	initGPSTimeFilters() {
 
 		let elGPSTimeFilterPanel = $('#gpstime_filter_panel');
 
@@ -957,7 +1024,7 @@ export class Sidebar{
 			let initialized = false;
 
 			let initialize = () => {
-				
+
 				let elRangeContainer = $("#gpstime_multilevel_range_container");
 				elRangeContainer[0].prepend(slider.element);
 
@@ -974,7 +1041,7 @@ export class Sidebar{
 				let extent = this.viewer.getGpsTimeExtent();
 				let gpsTimeAvailable = extent[0] !== Infinity;
 
-				if(!initialized && gpsTimeAvailable){
+				if (!initialized && gpsTimeAvailable) {
 					initialize();
 				}
 
@@ -984,7 +1051,7 @@ export class Sidebar{
 
 
 		{
-			
+
 			const txtGpsTime = elGPSTimeFilterPanel.find("#txtGpsTime");
 			const btnFindGpsTime = elGPSTimeFilterPanel.find("#btnFindGpsTime");
 
@@ -993,12 +1060,12 @@ export class Sidebar{
 			txtGpsTime.on("input", (e) => {
 				const str = txtGpsTime.val();
 
-				if(!isNaN(str)){
+				if (!isNaN(str)) {
 					const value = parseFloat(str);
 					targetTime = value;
 
 					txtGpsTime.css("background-color", "")
-				}else{
+				} else {
 					targetTime = null;
 
 					txtGpsTime.css("background-color", "#ff9999")
@@ -1006,9 +1073,9 @@ export class Sidebar{
 
 			});
 
-			btnFindGpsTime.click( () => {
-				
-				if(targetTime !== null){
+			btnFindGpsTime.click(() => {
+
+				if (targetTime !== null) {
 					viewer.moveToGpsTimeVicinity(targetTime);
 				}
 			});
@@ -1041,12 +1108,12 @@ export class Sidebar{
 			this.viewer.addEventListener("update", (e) => {
 				let extent = this.viewer.filterPointSourceIDRange;
 
-				if(!initialized){
+				if (!initialized) {
 					initialize();
 
 					slider.setValues(extent);
 				}
-				
+
 			});
 		}
 
@@ -1083,7 +1150,7 @@ export class Sidebar{
 
 	}
 
-	initClassificationList(){
+	initClassificationList() {
 		let elClassificationList = $('#classificationList');
 
 		let addClassificationItem = (code, name) => {
@@ -1110,7 +1177,7 @@ export class Sidebar{
 				this.viewer.setClassificationVisibility(code, event.target.checked);
 			});
 
-			let defaultColor = classification.color.map(c => c *  255).join(", ");
+			let defaultColor = classification.color.map(c => c * 255).join(", ");
 			defaultColor = `rgb(${defaultColor})`;
 
 
@@ -1155,7 +1222,7 @@ export class Sidebar{
 			elClassificationList.append(element);
 		}
 
-		const addInvertButton = () => { 
+		const addInvertButton = () => {
 			const element = $(`
 				<li>
 					<input type="button" value="invert" />
@@ -1164,10 +1231,10 @@ export class Sidebar{
 
 			let elInput = element.find('input');
 
-			elInput.click( () => {
+			elInput.click(() => {
 				const classifications = this.viewer.classifications;
-	
-				for(let key of Object.keys(classifications)){
+
+				for (let key of Object.keys(classifications)) {
 					let value = classifications[key];
 					this.viewer.setClassificationVisibility(key, !value.visible);
 				}
@@ -1194,7 +1261,7 @@ export class Sidebar{
 		this.viewer.addEventListener("classification_visibility_changed", () => {
 
 			{ // set checked state of classification buttons
-				for(const classID of Object.keys(this.viewer.classifications)){
+				for (const classID of Object.keys(this.viewer.classifications)) {
 					const classValue = this.viewer.classifications[classID];
 
 					let elItem = elClassificationList.find(`#chkClassification_${classID}`);
@@ -1205,8 +1272,8 @@ export class Sidebar{
 			{ // set checked state of toggle button based on state of all other buttons
 				let numVisible = 0;
 				let numItems = 0;
-				for(const key of Object.keys(this.viewer.classifications)){
-					if(this.viewer.classifications[key].visible){
+				for (const key of Object.keys(this.viewer.classifications)) {
+					if (this.viewer.classifications[key].visible) {
 						numVisible++;
 					}
 					numItems++;
@@ -1219,8 +1286,8 @@ export class Sidebar{
 		});
 	}
 
-	initAccordion(){
-		$('.accordion > h3').each(function(){
+	initAccordion() {
+		$('.accordion > h3').each(function () {
 			let header = $(this);
 			let content = $(this).next();
 
@@ -1247,19 +1314,19 @@ export class Sidebar{
 		];
 
 		let elLanguages = $('#potree_languages');
-		for(let i = 0; i < languages.length; i++){
+		for (let i = 0; i < languages.length; i++) {
 			let [key, value] = languages[i];
 			let element = $(`<a>${key}</a>`);
 			element.click(() => this.viewer.setLanguage(value));
 
-			if(i === 0){
+			if (i === 0) {
 				element.css("margin-left", "30px");
 			}
-			
+
 			elLanguages.append(element);
 
-			if(i < languages.length - 1){
-				elLanguages.append($(document.createTextNode(' - ')));	
+			if (i < languages.length - 1) {
+				elLanguages.append($(document.createTextNode(' - ')));
 			}
 		}
 
@@ -1271,7 +1338,7 @@ export class Sidebar{
 		// $("#menu_tools").next().show()
 	}
 
-	initAppearance(){
+	initAppearance() {
 
 		const sldPointBudget = this.dom.find('#sldPointBudget');
 
@@ -1280,49 +1347,69 @@ export class Sidebar{
 			min: 100 * 1000,
 			max: 10 * 1000 * 1000,
 			step: 1000,
-			slide: (event, ui) => { this.viewer.setPointBudget(ui.value); }
+			slide: (event, ui) => { this.viewer.setPointBudget(ui.value); },
+			create: function () {
+				$(this).find('.ui-slider-handle').css('touch-action', 'none');
+			}
 		});
+		this.installTouchFix(sldPointBudget);
 
 		this.dom.find('#sldFOV').slider({
 			value: this.viewer.getFOV(),
 			min: 20,
 			max: 100,
 			step: 1,
-			slide: (event, ui) => { this.viewer.setFOV(ui.value); }
+			slide: (event, ui) => { this.viewer.setFOV(ui.value); },
+			create: function () {
+				$(this).find('.ui-slider-handle').css('touch-action', 'none');
+			}
 		});
+		this.installTouchFix(this.dom.find('#sldFOV'));
 
 		$('#sldEDLRadius').slider({
 			value: this.viewer.getEDLRadius(),
 			min: 1,
 			max: 4,
 			step: 0.01,
-			slide: (event, ui) => { this.viewer.setEDLRadius(ui.value); }
+			slide: (event, ui) => { this.viewer.setEDLRadius(ui.value); },
+			create: function () {
+				$(this).find('.ui-slider-handle').css('touch-action', 'none');
+			}
 		});
+		this.installTouchFix($('#sldEDLRadius'));
 
 		$('#sldEDLStrength').slider({
 			value: this.viewer.getEDLStrength(),
 			min: 0,
 			max: 5,
 			step: 0.01,
-			slide: (event, ui) => { this.viewer.setEDLStrength(ui.value); }
+			slide: (event, ui) => { this.viewer.setEDLStrength(ui.value); },
+			create: function () {
+				$(this).find('.ui-slider-handle').css('touch-action', 'none');
+			}
 		});
+		this.installTouchFix($('#sldEDLStrength'));
 
 		$('#sldEDLOpacity').slider({
 			value: this.viewer.getEDLOpacity(),
 			min: 0,
 			max: 1,
 			step: 0.01,
-			slide: (event, ui) => { this.viewer.setEDLOpacity(ui.value); }
+			slide: (event, ui) => { this.viewer.setEDLOpacity(ui.value); },
+			create: function () {
+				$(this).find('.ui-slider-handle').css('touch-action', 'none');
+			}
 		});
+		this.installTouchFix($('#sldEDLOpacity'));
 
 		this.viewer.addEventListener('point_budget_changed', (event) => {
 			$('#lblPointBudget')[0].innerHTML = Utils.addCommas(this.viewer.getPointBudget());
-			sldPointBudget.slider({value: this.viewer.getPointBudget()});
+			sldPointBudget.slider({ value: this.viewer.getPointBudget() });
 		});
 
 		this.viewer.addEventListener('fov_changed', (event) => {
 			$('#lblFOV')[0].innerHTML = parseInt(this.viewer.getFOV());
-			$('#sldFOV').slider({value: this.viewer.getFOV()});
+			$('#sldFOV').slider({ value: this.viewer.getFOV() });
 		});
 
 		this.viewer.addEventListener('use_edl_changed', (event) => {
@@ -1331,12 +1418,12 @@ export class Sidebar{
 
 		this.viewer.addEventListener('edl_radius_changed', (event) => {
 			$('#lblEDLRadius')[0].innerHTML = this.viewer.getEDLRadius().toFixed(1);
-			$('#sldEDLRadius').slider({value: this.viewer.getEDLRadius()});
+			$('#sldEDLRadius').slider({ value: this.viewer.getEDLRadius() });
 		});
 
 		this.viewer.addEventListener('edl_strength_changed', (event) => {
 			$('#lblEDLStrength')[0].innerHTML = this.viewer.getEDLStrength().toFixed(1);
-			$('#sldEDLStrength').slider({value: this.viewer.getEDLStrength()});
+			$('#sldEDLStrength').slider({ value: this.viewer.getEDLStrength() });
 		});
 
 		this.viewer.addEventListener('background_changed', (event) => {
@@ -1348,25 +1435,25 @@ export class Sidebar{
 		$('#lblEDLRadius')[0].innerHTML = this.viewer.getEDLRadius().toFixed(1);
 		$('#lblEDLStrength')[0].innerHTML = this.viewer.getEDLStrength().toFixed(1);
 		$('#chkEDLEnabled')[0].checked = this.viewer.getEDLEnabled();
-		
+
 		{
 			let elBackground = $(`#background_options`);
-			elBackground.selectgroup();
-
-			elBackground.find("input").click( (e) => {
-				this.viewer.setBackground(e.target.value);
+			// native select
+			elBackground.change((e) => {
+				this.viewer.setBackground(e.target.value === 'null' ? null : e.target.value);
 			});
 
 			let currentBackground = this.viewer.getBackground();
-			$(`input[name=background_options][value=${currentBackground}]`).trigger("click");
+			if (currentBackground === null) currentBackground = 'null';
+			elBackground.val(currentBackground);
 		}
 
-		$('#chkEDLEnabled').click( () => {
+		$('#chkEDLEnabled').click(() => {
 			this.viewer.setEDLEnabled($('#chkEDLEnabled').prop("checked"));
 		});
 	}
 
-	initNavigation(){
+	initNavigation() {
 		let elNavigation = $('#navigation');
 		let sldMoveSpeed = $('#sldMoveSpeed');
 		let lblMoveSpeed = $('#lblMoveSpeed');
@@ -1389,7 +1476,7 @@ export class Sidebar{
 		elNavigation.append(this.createToolIcon(
 			Potree.resourcePath + '/icons/helicopter_controls.svg',
 			'[title]tt.heli_control',
-			() => { 
+			() => {
 				this.viewer.setControls(this.viewer.fpControls);
 				this.viewer.fpControls.lockElevation = true;
 			}
@@ -1410,7 +1497,7 @@ export class Sidebar{
 		elNavigation.append(this.createToolIcon(
 			Potree.resourcePath + "/icons/navigation_cube.svg",
 			"[title]tt.navigation_cube_control",
-			() => {this.viewer.toggleNavigationCube()}
+			() => { this.viewer.toggleNavigationCube() }
 		));
 
 		elNavigation.append(this.createToolIcon(
@@ -1439,37 +1526,37 @@ export class Sidebar{
 		elNavigation.append(this.createToolIcon(
 			Potree.resourcePath + "/icons/left.svg",
 			"[title]tt.left_view_control",
-			() => {this.viewer.setLeftView()}
+			() => { this.viewer.setLeftView() }
 		));
 
 		elNavigation.append(this.createToolIcon(
 			Potree.resourcePath + "/icons/right.svg",
 			"[title]tt.right_view_control",
-			() => {this.viewer.setRightView()}
+			() => { this.viewer.setRightView() }
 		));
 
 		elNavigation.append(this.createToolIcon(
 			Potree.resourcePath + "/icons/front.svg",
 			"[title]tt.front_view_control",
-			() => {this.viewer.setFrontView()}
+			() => { this.viewer.setFrontView() }
 		));
 
 		elNavigation.append(this.createToolIcon(
 			Potree.resourcePath + "/icons/back.svg",
 			"[title]tt.back_view_control",
-			() => {this.viewer.setBackView()}
+			() => { this.viewer.setBackView() }
 		));
 
 		elNavigation.append(this.createToolIcon(
 			Potree.resourcePath + "/icons/top.svg",
 			"[title]tt.top_view_control",
-			() => {this.viewer.setTopView()}
+			() => { this.viewer.setTopView() }
 		));
 
 		elNavigation.append(this.createToolIcon(
 			Potree.resourcePath + "/icons/bottom.svg",
 			"[title]tt.bottom_view_control",
-			() => {this.viewer.setBottomView()}
+			() => { this.viewer.setBottomView() }
 		));
 
 
@@ -1477,19 +1564,19 @@ export class Sidebar{
 
 
 		let elCameraProjection = $(`
-			<selectgroup id="camera_projection_options">
-				<option id="camera_projection_options_perspective" value="PERSPECTIVE">Perspective</option>
-				<option id="camera_projection_options_orthigraphic" value="ORTHOGRAPHIC">Orthographic</option>
-			</selectgroup>
+			<select id="camera_projection_options" class="custom-select">
+				<option value="PERSPECTIVE">Perspective</option>
+				<option value="ORTHOGRAPHIC">Orthographic</option>
+			</select>
 		`);
 		elNavigation.append(elCameraProjection);
-		elCameraProjection.selectgroup({title: "Camera Projection"});
-		elCameraProjection.find("input").click( (e) => {
+
+		elCameraProjection.change((e) => {
 			this.viewer.setCameraMode(CameraMode[e.target.value]);
 		});
 		let cameraMode = Object.keys(CameraMode)
-			.filter(key => CameraMode[key] === this.viewer.scene.cameraMode);
-		elCameraProjection.find(`input[value=${cameraMode}]`).trigger("click");
+			.filter(key => CameraMode[key] === this.viewer.scene.cameraMode)[0];
+		if (cameraMode) elCameraProjection.val(cameraMode);
 
 		let speedRange = new THREE.Vector2(1, 10 * 1000);
 
@@ -1501,24 +1588,29 @@ export class Sidebar{
 			return Math.pow((value - speedRange.x) / speedRange.y, 1 / 4);
 		};
 
+
 		sldMoveSpeed.slider({
 			value: toExpSpeed(this.viewer.getMoveSpeed()),
 			min: 0,
 			max: 1,
 			step: 0.01,
-			slide: (event, ui) => { this.viewer.setMoveSpeed(toLinearSpeed(ui.value)); }
+			slide: (event, ui) => { this.viewer.setMoveSpeed(toLinearSpeed(ui.value)); },
+			create: function () {
+				$(this).find('.ui-slider-handle').css('touch-action', 'none');
+			}
 		});
+		this.installTouchFix(sldMoveSpeed);
 
 		this.viewer.addEventListener('move_speed_changed', (event) => {
 			lblMoveSpeed.html(this.viewer.getMoveSpeed().toFixed(1));
-			sldMoveSpeed.slider({value: toExpSpeed(this.viewer.getMoveSpeed())});
+			sldMoveSpeed.slider({ value: toExpSpeed(this.viewer.getMoveSpeed()) });
 		});
 
 		lblMoveSpeed.html(this.viewer.getMoveSpeed().toFixed(1));
 	}
 
 
-	initSettings(){
+	initSettings() {
 
 		{
 			$('#sldMinNodeSize').slider({
@@ -1526,24 +1618,29 @@ export class Sidebar{
 				min: 0,
 				max: 1000,
 				step: 0.01,
-				slide: (event, ui) => { this.viewer.setMinNodeSize(ui.value); }
+				slide: (event, ui) => { this.viewer.setMinNodeSize(ui.value); },
+				create: function () {
+					$(this).find('.ui-slider-handle').css('touch-action', 'none');
+				}
 			});
+
+			this.installTouchFix($('#sldMinNodeSize'));
 
 			this.viewer.addEventListener('minnodesize_changed', (event) => {
 				$('#lblMinNodeSize').html(parseInt(this.viewer.getMinNodeSize()));
-				$('#sldMinNodeSize').slider({value: this.viewer.getMinNodeSize()});
+				$('#sldMinNodeSize').slider({ value: this.viewer.getMinNodeSize() });
 			});
 			$('#lblMinNodeSize').html(parseInt(this.viewer.getMinNodeSize()));
 		}
 
 		{
-			let elSplatQuality = $("#splat_quality_options");
-			elSplatQuality.selectgroup({title: "Splat Quality"});
 
-			elSplatQuality.find("input").click( (e) => {
-				if(e.target.value === "standard"){
+			let elSplatQuality = $("#splat_quality_options");
+			// native select
+			elSplatQuality.change((e) => {
+				if (e.target.value === "standard") {
 					this.viewer.useHQ = false;
-				}else if(e.target.value === "hq"){
+				} else if (e.target.value === "hq") {
 					this.viewer.useHQ = true;
 				}
 			});

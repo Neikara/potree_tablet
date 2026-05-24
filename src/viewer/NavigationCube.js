@@ -108,7 +108,7 @@ export class NavigationCube extends THREE.Object3D {
 			}
 		};
 
-		this.viewer.renderer.domElement.addEventListener('mousedown', onMouseDown, false);
+		this.viewer.renderer.domElement.addEventListener('pointerdown', onMouseDown, false);
 	}
 
 	update(rotation) {

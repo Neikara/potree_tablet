@@ -41,6 +41,8 @@ export class OrbitControls extends EventDispatcher{
 		this.doubleClockZoomEnabled = true;
 
 		this.tweens = [];
+		
+		this.activePointers = new Map();
 
 		let drag = (e) => {
 			if (e.drag.object !== null) {
@@ -89,61 +91,66 @@ export class OrbitControls extends EventDispatcher{
 			}
 		};
 
-		let previousTouch = null;
-		let touchStart = e => {
-			previousTouch = e;
+		let onPointerDown = e => {
+			this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		};
 
-		let touchEnd = e => {
-			previousTouch = e;
+		let onPointerUp = e => {
+			this.activePointers.delete(e.pointerId);
+			if (this.activePointers.size === 0) {
+				this.wasPinching = false; // On reset l'état seulement quand tout est lâché
+			}
 		};
 
-		let touchMove = e => {
-			if (e.touches.length === 2 && previousTouch.touches.length === 2){
-				let prev = previousTouch;
-				let curr = e;
-
-				let prevDX = prev.touches[0].pageX - prev.touches[1].pageX;
-				let prevDY = prev.touches[0].pageY - prev.touches[1].pageY;
+		let onPointerMove = e => {
+			if (!this.activePointers.has(e.pointerId)) return;
+				
+			if (this.activePointers.size === 2) {
+				// --- MODE DEUX DOIGTS (ZOOM & PAN) ---
+				// On stoppe toute rotation en mettant les deltas à zéro
+				this.wasPinching = true;
+				this.yawDelta = 0;
+				this.pitchDelta = 0;
+				let otherPointerId = Array.from(this.activePointers.keys()).find(id => id !== e.pointerId);
+				let otherPointer = this.activePointers.get(otherPointerId);
+				let prevPointer = this.activePointers.get(e.pointerId);
+				
+				let prevDX = prevPointer.x - otherPointer.x;
+				let prevDY = prevPointer.y - otherPointer.y;
 				let prevDist = Math.sqrt(prevDX * prevDX + prevDY * prevDY);
-
-				let currDX = curr.touches[0].pageX - curr.touches[1].pageX;
-				let currDY = curr.touches[0].pageY - curr.touches[1].pageY;
+				
+				let currDX = e.clientX - otherPointer.x;
+				let currDY = e.clientY - otherPointer.y;
 				let currDist = Math.sqrt(currDX * currDX + currDY * currDY);
-
-				let delta = currDist / prevDist;
-				let resolvedRadius = this.scene.view.radius + this.radiusDelta;
-				let newRadius = resolvedRadius / delta;
-				this.radiusDelta = newRadius - resolvedRadius;
-
-				this.stopTweens();
-			}else if(e.touches.length === 3 && previousTouch.touches.length === 3){
-				let prev = previousTouch;
-				let curr = e;
-
-				let prevMeanX = (prev.touches[0].pageX + prev.touches[1].pageX + prev.touches[2].pageX) / 3;
-				let prevMeanY = (prev.touches[0].pageY + prev.touches[1].pageY + prev.touches[2].pageY) / 3;
-
-				let currMeanX = (curr.touches[0].pageX + curr.touches[1].pageX + curr.touches[2].pageX) / 3;
-				let currMeanY = (curr.touches[0].pageY + curr.touches[1].pageY + curr.touches[2].pageY) / 3;
-
-				let delta = {
-					x: (currMeanX - prevMeanX) / this.renderer.domElement.clientWidth,
-					y: (currMeanY - prevMeanY) / this.renderer.domElement.clientHeight
-				};
-
-				this.panDelta.x += delta.x;
-				this.panDelta.y += delta.y;
-
+				
+				if (prevDist > 0) {
+					let zoomDelta = currDist / prevDist;
+					let resolvedRadius = this.scene.view.radius + this.radiusDelta;
+					let newRadius = resolvedRadius / zoomDelta;
+					this.radiusDelta += newRadius - resolvedRadius;
+				}
+				
+				let prevCenterX = (prevPointer.x + otherPointer.x) / 2;
+				let prevCenterY = (prevPointer.y + otherPointer.y) / 2;
+				
+				let currCenterX = (e.clientX + otherPointer.x) / 2;
+				let currCenterY = (e.clientY + otherPointer.y) / 2;
+				
+				let panX = (currCenterX - prevCenterX) / this.renderer.domElement.clientWidth;
+				let panY = (currCenterY - prevCenterY) / this.renderer.domElement.clientHeight;
+				
+				this.panDelta.x += panX;
+				this.panDelta.y += panY;
+				
 				this.stopTweens();
 			}
-
-			previousTouch = e;
+		this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 		};
-
-		this.addEventListener('touchstart', touchStart);
-		this.addEventListener('touchend', touchEnd);
-		this.addEventListener('touchmove', touchMove);
+		
+		this.renderer.domElement.addEventListener('pointerdown', onPointerDown);
+		this.renderer.domElement.addEventListener('pointerup', onPointerUp);
+		this.renderer.domElement.addEventListener('pointercancel', onPointerUp);
+		this.renderer.domElement.addEventListener('pointermove', onPointerMove);
 		this.addEventListener('drag', drag);
 		this.addEventListener('drop', drop);
 		this.addEventListener('mousewheel', scroll);

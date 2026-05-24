@@ -294,11 +294,11 @@ export class ProfileWindow extends EventDispatcher {
 			}
 		});
 
-		this.renderArea.mousedown(e => {
+		this.renderArea.on('pointerdown', e => {
 			this.mouseIsDown = true;
 		});
 
-		this.renderArea.mouseup(e => {
+		this.renderArea.on('pointerup', e => {
 			this.mouseIsDown = false;
 		});
 
@@ -311,7 +311,7 @@ export class ProfileWindow extends EventDispatcher {
 			this.viewerPickSphere.scale.set(scale, scale, scale);
 		};
 
-		this.renderArea.mousemove(e => {
+		this.renderArea.on('pointermove', e => {
 			if (this.pointclouds.size === 0) {
 				return;
 			}

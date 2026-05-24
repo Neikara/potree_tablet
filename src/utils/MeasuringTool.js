@@ -4,6 +4,7 @@ import {Measure} from "./Measure.js";
 import {Utils} from "../utils.js";
 import {CameraMode} from "../defines.js";
 import { EventDispatcher } from "../EventDispatcher.js";
+import { t } from "../i18n.js";
 
 function updateAzimuth(viewer, measure){
 
@@ -127,6 +128,8 @@ export class MeasuringTool extends EventDispatcher{
 		this.viewer = viewer;
 		this.renderer = viewer.renderer;
 
+		this._editMode = false;
+
 		this.addEventListener('start_inserting_measurement', e => {
 			this.viewer.dispatchEvent({
 				type: 'cancel_insertions'
@@ -139,6 +142,7 @@ export class MeasuringTool extends EventDispatcher{
 		this.light = new THREE.PointLight(0xffffff, 1.0);
 		this.scene.add(this.light);
 
+		// Register interactive scene (allows moving points on PC)
 		this.viewer.inputHandler.registerInteractiveScene(this.scene);
 
 		this.onRemove = (e) => { this.scene.remove(e.measurement);};
@@ -156,6 +160,31 @@ export class MeasuringTool extends EventDispatcher{
 		viewer.scene.addEventListener('measurement_removed', this.onRemove);
 	}
 
+	get editMode(){
+		return this._editMode;
+	}
+
+	set editMode(value){
+		if(this._editMode !== value){
+			this._editMode = value;
+
+			if(this.viewer && this.viewer.inputHandler){
+				if(this._editMode){
+					this.viewer.inputHandler.registerInteractiveScene(this.scene);
+				}else{
+					// Only unregister on tablet for touch safety
+					if(this.viewer.isTablet){
+						this.viewer.inputHandler.unregisterInteractiveScene(this.scene);
+						this.viewer.inputHandler.hoveredElements = [];
+						this.viewer.inputHandler.drag = null;
+					}
+				}
+			}
+
+			this.dispatchEvent({type: "edit_mode_changed", mode: value});
+		}
+	}
+
 	onSceneChange(e){
 		if(e.oldScene){
 			e.oldScene.removeEventListener('measurement_added', this.onAdd);
@@ -167,6 +196,10 @@ export class MeasuringTool extends EventDispatcher{
 	}
 
 	startInsertion (args = {}) {
+		const isTouchDevice = ('ontouchstart' in window) ||
+			(navigator.maxTouchPoints > 0 && window.matchMedia('(pointer: coarse)').matches);
+		if (isTouchDevice) {
+			this.editMode = true;}
 		let domElement = this.viewer.renderer.domElement;
 
 		let measure = new Measure();
@@ -200,12 +233,103 @@ export class MeasuringTool extends EventDispatcher{
 
 		this.scene.add(measure);
 
+		let longPressTimer = null;
+		let longPressTriggered = false;
+		let hintDiv = null;
+
+		const showHint = (msg) => {
+			if (!hintDiv) {
+				hintDiv = document.createElement('div');
+				hintDiv.style.position = 'absolute';
+				hintDiv.style.top = '20px';
+				hintDiv.style.left = '50%';
+				hintDiv.style.transform = 'translateX(-50%)';
+				hintDiv.style.zIndex = 10001;
+				hintDiv.style.padding = '8px 12px';
+				hintDiv.style.background = 'rgba(0, 0, 0, 0.6)';
+				hintDiv.style.color = '#fff';
+				hintDiv.style.borderRadius = '4px';
+				this.viewer.renderArea.appendChild(hintDiv);
+			}
+			hintDiv.textContent = msg;
+			hintDiv.style.display = 'block';
+		};
+
+		const hideHint = () => {
+			if (hintDiv) {
+				hintDiv.style.display = 'none';
+			}
+		};
+
+		const clearLongPressTimer = () => {
+			if (longPressTimer) {
+				clearTimeout(longPressTimer);
+				longPressTimer = null;
+			}
+		};
+
+		const finalizeMeasurement = () => {
+			if (isTouchDevice){
+				longPressTriggered = true;
+				measure.closed = true;
+				this.editMode = false;
+				showHint(t('measure_done'));
+				setTimeout(() => { hideHint(); }, 1200);
+				if (this.viewer && this.viewer.inputHandler) {
+					this.viewer.inputHandler.drag = null;
+				}
+				domElement.removeEventListener('pointerdown', onPointerDown, false);
+				domElement.removeEventListener('pointermove', onPointerMove, false);
+				domElement.removeEventListener('pointerup', onPointerUp, false);
+				domElement.removeEventListener('pointercancel', onPointerCancel, false);
+				if (this.viewer) {
+					this.viewer.removeEventListener('cancel_insertions', cancel.callback);
+				}
+			};
+		}	
+
+		const onPointerDown = (e) => {
+			if (!this.editMode) { return; }
+			clearLongPressTimer();
+			longPressTriggered = false;
+			showHint(t('measure_hold'));
+			longPressTimer = setTimeout(() => {
+				finalizeMeasurement();
+			}, 700);
+		};
+
+		const onPointerMove = () => {
+			clearLongPressTimer();
+			hideHint();
+		};
+
+		const onPointerUp = () => {
+			clearLongPressTimer();
+			hideHint();
+		};
+
+		const onPointerCancel = () => {
+			clearLongPressTimer();
+			hideHint();
+		};
+
+		if (isTouchDevice) {
+			domElement.addEventListener('pointerdown', onPointerDown, false);
+			domElement.addEventListener('pointermove', onPointerMove, false);
+			domElement.addEventListener('pointerup', onPointerUp, false);
+			domElement.addEventListener('pointercancel', onPointerCancel, false);
+		}
+
 		let cancel = {
 			removeLastMarker: measure.maxMarkers > 3,
 			callback: null
 		};
 
 		let insertionCallback = (e) => {
+			if (longPressTriggered) {
+				return;
+			}
+
 			if (e.button === THREE.MOUSE.LEFT) {
 				measure.addMarker(measure.points[measure.points.length - 1].position.clone());
 
@@ -213,8 +337,8 @@ export class MeasuringTool extends EventDispatcher{
 					cancel.callback();
 				}
 
-				this.viewer.inputHandler.startDragging(
-					measure.spheres[measure.spheres.length - 1]);
+				let newTouchSphere = measure.touchSpheres[measure.touchSpheres.length - 1] || measure.spheres[measure.spheres.length - 1];
+				this.viewer.inputHandler.startDragging(newTouchSphere);
 			} else if (e.button === THREE.MOUSE.RIGHT) {
 				cancel.callback();
 			}
@@ -224,18 +348,32 @@ export class MeasuringTool extends EventDispatcher{
 			if (cancel.removeLastMarker) {
 				measure.removeMarker(measure.points.length - 1);
 			}
-			domElement.removeEventListener('mouseup', insertionCallback, false);
+			if (this.viewer && this.viewer.inputHandler) {
+				this.viewer.inputHandler.drag = null;
+			}
+			this.editMode = false;
+			domElement.removeEventListener('pointerup', insertionCallback, false);
+			if (isTouchDevice) {
+				domElement.removeEventListener('pointerdown', onPointerDown, false);
+				domElement.removeEventListener('pointermove', onPointerMove, false);
+				domElement.removeEventListener('pointerup', onPointerUp, false);
+				domElement.removeEventListener('pointercancel', onPointerCancel, false);
+			}
 			this.viewer.removeEventListener('cancel_insertions', cancel.callback);
 		};
 
 		if (measure.maxMarkers > 1) {
 			this.viewer.addEventListener('cancel_insertions', cancel.callback);
-			domElement.addEventListener('mouseup', insertionCallback, false);
+			domElement.addEventListener('pointerup', insertionCallback, false);
 		}
 
 		measure.addMarker(new THREE.Vector3(0, 0, 0));
-		this.viewer.inputHandler.startDragging(
-			measure.spheres[measure.spheres.length - 1]);
+		let touchSphere = measure.touchSpheres[measure.touchSpheres.length - 1];
+		if (touchSphere) {
+			this.viewer.inputHandler.startDragging(touchSphere);
+		} else {
+			this.viewer.inputHandler.startDragging(measure.spheres[measure.spheres.length - 1]);
+		}
 
 		this.viewer.scene.addMeasurement(measure);
 
@@ -267,6 +405,17 @@ export class MeasuringTool extends EventDispatcher{
 				let pr = Utils.projectedRadius(1, camera, distance, clientWidth, clientHeight);
 				let scale = (15 / pr);
 				sphere.scale.set(scale, scale, scale);
+			}
+
+			// touch spheres
+			if (measure.touchSpheres){
+				for(let i = 0; i < measure.touchSpheres.length; i++){
+					let touchSphere = measure.touchSpheres[i];
+					let sphere = measure.spheres[i];
+					if(!touchSphere || !sphere) continue;
+					touchSphere.position.copy(sphere.position);
+					touchSphere.scale.copy(sphere.scale).multiplyScalar(2.2);
+				}
 			}
 
 			// labels

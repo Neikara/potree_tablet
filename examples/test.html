@@ -40,39 +40,34 @@
 	
 	<script type="module">
 
+	import * as THREE from "../libs/three.js/build/three.module.js";
+	
 		window.viewer = new Potree.Viewer(document.getElementById("potree_render_area"));
 		
 		viewer.setEDLEnabled(true);
 		viewer.setFOV(60);
 		viewer.setPointBudget(1_000_000);
 		viewer.loadSettingsFromURL();
-		viewer.setBackground("skybox");
 		
-		// viewer.setDescription(`Point cloud courtesy of PG&E and <a href="https://opentopography.org/">Open Topography</a>.`);
+		viewer.setDescription("");
 		
 		viewer.loadGUI(() => {
 			viewer.setLanguage('en');
-			$("#menu_tools").next().show();
-			$("#menu_clipping").next().show();
-			viewer.toggleSidebar();
+			$("#menu_appearance").next().show();
+			//viewer.toggleSidebar();
 		});
 		
-		// Load and add point cloud to scene
-		Potree.loadPointCloud("../pointclouds/lion_takanawa/cloud.js", "Lion", e => {
-			let scene = viewer.scene;
-			let pointcloud = e.pointcloud;
+		// Lion
+		Potree.loadPointCloud("https://panorama.ulb.ac.be/potree/clouds/pointclouds/ElCastillo/ElCastillo_RGB/cloud.js", "elcastillo", function(e){
+			viewer.scene.addPointCloud(e.pointcloud);
 			
-			let material = pointcloud.material;
-			material.size = 0.6;
+			let material = e.pointcloud.material;
+			material.size = 1;
 			material.pointSizeType = Potree.PointSizeType.ADAPTIVE;
-			material.shape = Potree.PointShape.SQUARE;
-			material.activeAttributeName = "rgba";
 			
-			scene.addPointCloud(pointcloud);
-			
-			viewer.fitToScreen(0.6);
+			viewer.fitToScreen();
 		});
-
+		
 	</script>
 	
 	

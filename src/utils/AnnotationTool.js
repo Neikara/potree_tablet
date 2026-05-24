@@ -46,14 +46,14 @@ export class AnnotationTool extends EventDispatcher{
 		callbacks.cancel = e => {
 			annotations.remove(annotation);
 
-			domElement.removeEventListener('mouseup', insertionCallback, true);
+			domElement.removeEventListener('pointerup', insertionCallback, true);
 		};
 
 		callbacks.finish = e => {
-			domElement.removeEventListener('mouseup', insertionCallback, true);
+			domElement.removeEventListener('pointerup', insertionCallback, true);
 		};
 
-		domElement.addEventListener('mouseup', insertionCallback, true);
+		domElement.addEventListener('pointerup', insertionCallback, true);
 
 		let drag = (e) => {
 			let I = Utils.getMousePointCloudIntersection(

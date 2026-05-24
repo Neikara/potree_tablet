@@ -312,7 +312,9 @@ a:hover, a:visited, a:link, a:active{
 
 canvas { 
 	width: 100%; 
-	height: 100% 
+	height: 100%;
+    touch-action: none;   /* Empêche le zoom/scroll natif du navigateur */
+    user-select: none;    /* Empêche la sélection de texte parasite */
 }
 
 body{ 
@@ -792,4 +794,279 @@ body{
 	font-weight: bold;
 	padding-top: 0.6em;
 	padding-bottom: 0.1em;
+}
+
+
+
+/* @media (pointer: coarse) {
+/*     /* Tout le code que je vous ai donné précédemment va ICI */
+/*     /* Ces règles écraseront les anciennes UNIQUEMENT sur tablette */
+/* 
+/* 	#potree_sidebar_container {
+/* 	    position: absolute;
+/* 	    z-index: 10;
+/* 	    width: 100% !important;
+/* 	    height: 100% !important;
+/* 	    background-color: transparent !important; /* On enlève le fond opaque */
+/* 	    pointer-events: none; /* IMPORTANT : permet de cliquer sur la 3D à travers le vide */
+/* 	}
+/* 
+/* 	/* On réactive explicitement tout ce qui est cliquable ou ajustable */
+/* 	/* Include both possible root IDs: #potree_sidebar_root (old) and #sidebar_root (current template) */
+/* 	#potree_sidebar_root h3, #sidebar_root h3,             /* Les titres de sections (Appearance, Tools, etc.) */
+/* 	#potree_sidebar_root input, #sidebar_root input,          /* Les Sliders (point budget, FOV) et Checkboxes (EDL) */
+/* 	#potree_sidebar_root select, #sidebar_root select,         /* Les menus déroulants */
+/* 	#potree_sidebar_root selectgroup, #sidebar_root selectgroup,    /* Les groupes de sélection (Background, Splat quality) */
+/* 	#potree_sidebar_root a, #sidebar_root a,              /* Les liens (potree.org, github) */
+/* 	#potree_sidebar_root .divider, #sidebar_root .divider,       /* Les séparateurs (si vous voulez qu'ils réagissent) */
+/* 	#classificationList li,       /* La liste des classifications */
+/* 	#tools, #clipping_tools,      /* Les icônes d'outils de mesure et découpe */
+/* 	#navigation                   /* Les modes de navigation */
+/* 	{
+/* 	    pointer-events: auto;
+/* 	}
+/* 
+/* 	/* Ensure native selects and inputs inside the sidebar are clickable (fixes dropdown not opening) */
+/* 	#sidebar_root select,
+/* 	#sidebar_root input,
+/* 	#sidebar_root button,
+/* 	#sidebar_root .ui-slider,
+/* 	#sidebar_root .ui-slider-handle,
+/* 	.custom-select {
+/* 		pointer-events: auto !important;
+/* 	}
+/* 	/* Réactiver la barre du slider et la poignée ronde */
+/* 	.ui-slider, 
+/* 	.ui-slider-handle, 
+/* 	.ui-slider-range {
+/* 	    pointer-events: auto !important;
+/* 	}
+/* 	#potree_sidebar_container .potree-panel {
+/* 	    pointer-events: auto; /* Permet d'interagir avec les panneaux */
+/* 	}
+/* 	#sidebar_root {
+/* 	    width: 100%;
+/* 	    height: 100%;
+/* 	    display: flex;
+/* 	    flex-direction: column; /* Aligne les éléments verticalement */
+/* 	    justify-content: flex-start; /* Positionne en haut */
+/* 	    align-items: stretch; /* Les éléments prennent toute la largeur */
+/* 	    overflow-y: auto; /* Permet le scroll vertical */
+/* 	}
+/* 	
+/* 	/* On désactive l'interaction sur les conteneurs globaux */
+/* 	#potree_sidebar_root, #sidebar_root {
+/* 	    pointer-events: none;
+/* 	}
+/* 	
+/* 	#potree_menu, 
+/* 	.pv-menu-list {
+/* 	    pointer-events: none;
+/* 	}
+/* 	
+/* 	/* Styliser chaque section individuellement */
+/* 	.potree-panel {
+/* 	    margin: 5px !important;
+/* 	    border-radius: 4px !important;
+/* 	}
+/* 	
+/* 	/* Afficher tous les contenus d'accordéon directement */
+/* 	.accordion > div {
+/* 	    display: block !important;
+/* 	}
+/* 	
+/* 	/* Optionnel : masquer les en-têtes des menus */
+/* 	.accordion > h3 {
+/* 	    display: none;
+/* 	}
+/* 	
+/* 	/* ========== LAYOUT TABLET PERSONNALISÉ ========== */
+/* 	
+/* 	/* Organisation des sections principales */
+/* 	#sidebar_root > * {
+/* 	    flex: 0 0 auto;
+/* 	    margin: 8px;
+/* 	}
+/* 	
+/* 	/* Groupe des outils (en haut à gauche) */
+/* 	#tools {
+/* 	    position: fixed;
+/* 	    bottom: auto;
+/* 	    top: 10px;
+/* 	    left: 10px;
+/* 	    z-index: 1001;
+/* 	    display: flex;
+/* 	    flex-wrap: wrap;
+/* 	    gap: 4px;
+/* 	    background: rgba(0,0,0,0.7);
+/* 	    padding: 8px;
+/* 	    border-radius: 8px;
+/* 	    max-width: 200px;
+/* 	}
+/* 	
+/* 	/* Navigation (haut à droite) */
+/* 	#navigation {
+/* 	    position: fixed;
+/* 	    top: 10px;
+/* 	    right: 10px;
+/* 	    z-index: 1001;
+/* 	    display: flex;
+/* 	    flex-wrap: wrap;
+/* 	    gap: 4px;
+/* 	    background: rgba(0,0,0,0.7);
+/* 	    padding: 8px;
+/* 	    border-radius: 8px;
+/* 	    max-width: 200px;
+/* 	}
+/* 	
+/* 	/* Outils de clipping (bas à droite) */
+/* 	#clipping_tools {
+/* 	    position: fixed;
+/* 	    bottom: 10px;
+/* 	    right: 10px;
+/* 	    z-index: 1001;
+/* 	    display: flex;
+/* 	    flex-wrap: wrap;
+/* 	    gap: 4px;
+/* 	    background: rgba(0,0,0,0.7);
+/* 	    padding: 8px;
+/* 	    border-radius: 8px;
+/* 	    max-width: 200px;
+/* 	}
+/* 	
+/* 	/* Panneaux à gauche (scrollable) */
+/* 	#potree_sidebar_container {
+/* 	    position: relative;
+/* 	    left: 0;
+/* 	    top: 0;
+/* 	    width: 100% !important;
+/* 	    height: 100% !important;
+/* 	    /* display: none; */ /* Masqué par défaut, actif au clic */
+/* 	}
+/* 	.custom-select {
+/*         display: block !important;
+/*         width: 100% !important;
+/*         min-height: 44px !important; /* Taille doigt */
+/*         background: var(--bg-light-color) !important;
+/*         color: white !important;
+/*         border: 1px solid white !important;
+/*         visibility: visible !important;
+/*         opacity: 1 !important;
+/*     }
+/* 	/* Réduire taille des panneaux sur tablette */
+/* 	.potree-panel {
+/* 	    max-width: 100% !important;
+/* 	    margin: 5px !important;
+/* 	}
+/* 	
+/* 	/* Texte et inputs plus accessibles */
+/* 	#potree_sidebar_root {
+/* 	    font-size: 16px;
+/* 	}
+/* 	
+/* 	#potree_sidebar_root input,
+/* 	#potree_sidebar_root select,
+/* 	#potree_sidebar_root textarea {
+/* 	    min-height: 40px;
+/* 	    font-size: 16px;
+/* 	}
+/* 	/* Styles compacts pour les selects natifs */
+/* 	.custom-select {
+/* 		width: 100%;
+/* 		padding: 4px 8px;
+/* 		margin: 2px 0;
+/* 		font-size: 14px;
+/* 		background-color: var(--bg-light-color);
+/* 		color: var(--font-color);
+/* 		border: 1px solid #555;
+/* 		border-radius: 3px;
+/* 		cursor: pointer;
+/* 		min-height: 28px;
+/* 		height: auto;
+/* 		line-height: 1.4;
+/* 	}
+/* 	
+/* 	#sidebar_root label {
+/* 		display: flex;
+/* 		align-items: center;
+/* 		gap: 8px;
+/* 		margin: 4px 0;
+/* 		font-size: 14px;
+/* 	}
+/* 	
+/* 	#sidebar_root label .custom-select {
+/* 		flex: 1;
+/* 		margin: 0;
+/* 	}
+/* 	/* Boutons plus grands */
+/* 	.button-icon {
+/* 	    width: 44px !important;
+/* 	    height: 44px !important;
+/* 	}
+/* 	#potree_quick_buttons {
+/* 	    display: none !important;
+/* 	}
+/* 
+/* 	/* ========== PANNEAUX FLOTTANTS DÉPLAÇABLES ========== */
+/* 
+/* 	.floating-menu-panel {
+/* 		position: fixed;
+/* 		top: 80px;
+/* 		left: 20px;
+/* 		background: rgba(0, 0, 0, 0.9);
+/* 		border: 1px solid #555;
+/* 		border-radius: 6px;
+/* 		padding: 12px;
+/* 		max-width: 340px;
+/* 		max-height: 500px;
+/* 		overflow-y: auto;
+/* 		box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7);
+/* 		z-index: 1000;
+/* 		pointer-events: auto;
+/* 	}
+/* 
+/* 	.floating-menu-header {
+/* 		cursor: move;
+/* 		user-select: none;
+/* 		font-weight: bold;
+/* 		color: #aaa;
+/* 		font-size: 12px;
+/* 		letter-spacing: 1px;
+/* 		touch-action: none;
+/* 	}
+/* 
+/* 	.floating-menu-panel .ui-draggable-handle {
+/* 		cursor: move;
+/* 	}
+/* 
+}
+}
+
+/* Adaptation des sliders pour mobile/tactile */
+@media (pointer: coarse) {
+	.ui-slider .ui-slider-handle {
+		width: 30px !important;
+		height: 30px !important;
+		margin-left: -15px !important;
+		top: -10px !important;
+		border-radius: 50%;
+		border: 1px solid black !important;
+		background: #ffffff !important;
+		touch-action: none; /* Empêche le scroll vertical pendant le drag */
+    	-webkit-tap-highlight-color: transparent;
+	}
+	.ui-slider, .ui-slider-handle {
+	    touch-action: none !important;
+	    -ms-touch-action: none !important;
+	    user-select: none !important;
+	    -webkit-user-drag: none !important;
+	}
+	.ui-slider-horizontal {
+		height: 10px !important;
+	}
+
+	.pv-menu-list .ui-slider {
+		margin-top: 15px !important;
+		margin-bottom: 15px !important;
+	}
 }

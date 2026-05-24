@@ -66,7 +66,9 @@ void main(){
 		float pz = dp.z / dp.w;
 		float fragDepth = (pz + 1.0) / 2.0;
 
-		gl_FragDepthEXT = fragDepth;
+		#if defined(GL_EXT_frag_depth)
+			gl_FragDepthEXT = depth;
+		#endif
 	}
 
 	if(depth == 0.0){
