@@ -87837,10 +87837,8 @@ ENDSEC
 
 	let fakeCam = new PerspectiveCamera();
 
-	// Set to true to calculate surface normal (required for walls/ceilings)
-	const TORE_NORMAL = true;
 	// Set to true to display orbital center + orbit circles in VR
-	const ORBIT_DEBUG = true;
+	const ORBIT_DEBUG = false;
 	// ────────────────────────────────────────────────────────────────────────────
 
 	function toScene(vec, ref) {
@@ -88584,7 +88582,19 @@ ENDSEC
 			this._fadeDest = null;
 			this._fadeMesh = null;
 
-			// Références i18n pour mise à jour dynamique de la langue
+			// VR edit mode: laser-grab and reposition existing measurement points
+			this.vrEditMode = false;
+			this._vrEditHoveredMeasure = null;
+			this._vrEditHoveredIndex = -1;
+			this._vrEditDragging = false;
+			this._vrEditGrabDist = 0; // scene-space distance frozen at grab time
+
+			// VR annotations: numbered labels placed on the point cloud
+			this.vrAnnotateActive = false;
+			this._vrAnnotationCount = 0;
+			this._vrAnnotationSprites = []; // [{sprite, scenePos}]
+
+			// i18n dynamic label update
 			this._langLabels = [];
 			onLanguageChange(() => this._applyLang());
 
@@ -88891,8 +88901,9 @@ ENDSEC
 			const measuring = this.vrMeasureActive;
 			const rightCtrl = this._getControllerByHand('right');
 			const rightIsPrimary = (rightCtrl === this.cPrimary);
-			// Unique state key including the primary role to invalidate after swap
-			const state = (measuring ? 'MEASURE_' + this.navigationState : this.navigationState)
+			// Unique state key including mode flags to invalidate on any state change
+			const stateFlag = measuring ? 'MEASURE' : this.vrAnnotateActive ? 'ANNOTATE' : this.vrEditMode ? 'EDIT' : '';
+			const state = (stateFlag ? stateFlag + '_' + this.navigationState : this.navigationState)
 				+ (rightIsPrimary ? '_R' : '_L');
 			if (state === this._hintState) return;
 			this._hintState = state;
@@ -88900,7 +88911,15 @@ ENDSEC
 			const hp = this._hints.primary, hs = this._hints.secondary;
 			const roleSlots = ['thumbstick', 'trigger', 'grip'];
 
-			if (measuring) {
+			if (this.vrEditMode) {
+				const pSlots = ['⊙:Settings  ↔:Mode', 'Trigger: —', 'Grip: —'];
+				const sSlots = ['⊙:Appear  Stick:—', 'Trigger: Grab', 'Grip: —'];
+				roleSlots.forEach((k, i) => { hp[k].setText(pSlots[i]); hs[k].setText(sSlots[i]); });
+			} else if (this.vrAnnotateActive) {
+				const pSlots = ['⊙:Settings  ↔:Mode', 'Trigger: —', 'Grip: —'];
+				const sSlots = ['⊙:Appear  Stick:—', 'Trigger: Annotate', 'Grip: —'];
+				roleSlots.forEach((k, i) => { hp[k].setText(pSlots[i]); hs[k].setText(sSlots[i]); });
+			} else if (measuring) {
 				// Primary retains its navigation role; secondary places the markers
 				const navTrigger = { TELEPORT: 'Trigger: Teleport', MANIPULATE: 'Trigger: Grab' }[this.navigationState] || 'Trigger: —';
 				const pSlots = ['⊙:Settings  ↔:Mode', navTrigger, 'Grip: —'];
@@ -88920,7 +88939,16 @@ ENDSEC
 			const hRight = rightCtrl ? ((rightIsPrimary) ? hp : hs) : hp;
 			const hLeft = leftCtrl ? ((leftCtrl === this.cPrimary) ? hp : hs) : hs;
 
-			if (measuring) {
+			if (this.vrEditMode || this.vrAnnotateActive) {
+				// In edit/annotate mode: B/Y exit the mode (same hand as secondary)
+				if (rightIsPrimary) {
+					hRight.extra.setText('A:Rot-45  B:Mode');
+					hLeft.extra.setText('X:Rot+45  Y:Exit');
+				} else {
+					hRight.extra.setText('A:Rot-45  B:Exit');
+					hLeft.extra.setText('X:Rot+45  Y:Mode');
+				}
+			} else if (measuring) {
 				if (rightIsPrimary) {
 					hRight.extra.setText('A:Undo  B:Mode');
 					hLeft.extra.setText('X:—  Y:Stop');
@@ -89041,14 +89069,27 @@ ENDSEC
 
 			// ── Toggle Hints ──
 			const hintsBtnGeo = new PlaneGeometry(0.26, 0.034);
-			const hintsBtnMat = new MeshBasicMaterial({ color: 0x3a3a20, side: DoubleSide });
+			const hintsBtnMat = new MeshBasicMaterial({ color: 0x1a2a1a, side: DoubleSide });
 			const hintsBtn = new Mesh(hintsBtnGeo, hintsBtnMat);
 			hintsBtn.position.set(0.04, -0.180, 0.001);
 			node.add(hintsBtn);
-			const hintsLbl = self.createTextMesh('Hints: ON', 256, 30, 20);
+			const hintsLbl = self.createTextMesh('Hints', 180, 30, 20);
 			hintsLbl.position.set(0.04, -0.180, 0.002);
 			node.add(hintsLbl);
-			this.menuHintsRow = { y: -0.180, btn: hintsBtn, lbl: hintsLbl };
+			// Toggle pill: track + knob
+			const hintsPillTrack = new Mesh(
+				new PlaneGeometry(0.048, 0.018),
+				new MeshBasicMaterial({ color: 0x00aa44, side: DoubleSide })
+			);
+			hintsPillTrack.position.set(0.13, -0.180, 0.002);
+			node.add(hintsPillTrack);
+			const hintsPillKnob = new Mesh(
+				new CircleGeometry(0.010, 16),
+				new MeshBasicMaterial({ color: 0xffffff, side: DoubleSide })
+			);
+			hintsPillKnob.position.set(0.147, -0.180, 0.003);
+			node.add(hintsPillKnob);
+			this.menuHintsRow = { y: -0.180, btn: hintsBtn, lbl: hintsLbl, pillTrack: hintsPillTrack, pillKnob: hintsPillKnob };
 
 			// ── Button Reset View ──
 			const resetBtnGeo = new PlaneGeometry(0.26, 0.034);
@@ -89062,60 +89103,56 @@ ENDSEC
 			this._langLabels.push({ mesh: resetLbl, key: 'btn_reset' });
 			this.menuResetRow = { y: -0.215, btn: resetBtn };
 
-			// ── Button Clear Measurements ──
-			node.add(new Mesh(
-				new PlaneGeometry(0.34, 0.002),
-				new MeshBasicMaterial({ color: 0x444444, side: DoubleSide })
-			)).position.set(0, -0.248, 0.001);
-			const clearBtnGeo = new PlaneGeometry(0.26, 0.034);
-			const clearBtnMat = new MeshBasicMaterial({ color: 0x5a2a10, side: DoubleSide });
-			const clearBtn = new Mesh(clearBtnGeo, clearBtnMat);
-			clearBtn.position.set(0.04, -0.275, 0.001);
-			node.add(clearBtn);
-			const clearLbl = self.createTextMesh(t('btn_clear'), 256, 30, 20);
-			clearLbl.position.set(0.04, -0.275, 0.002);
-			node.add(clearLbl);
-			this._langLabels.push({ mesh: clearLbl, key: 'btn_clear' });
-			this.menuClearRow = { y: -0.275, btn: clearBtn };
-
 			// ── Button Swap Hands ──
 			node.add(new Mesh(
 				new PlaneGeometry(0.34, 0.002),
 				new MeshBasicMaterial({ color: 0x444444, side: DoubleSide })
-			)).position.set(0, -0.300, 0.001);
+			)).position.set(0, -0.250, 0.001);
 			const swapBtnGeo = new PlaneGeometry(0.26, 0.034);
 			const swapBtnMat = new MeshBasicMaterial({ color: 0x1a3a6a, side: DoubleSide });
 			const swapBtn = new Mesh(swapBtnGeo, swapBtnMat);
-			swapBtn.position.set(0.04, -0.325, 0.001);
+			swapBtn.position.set(0.04, -0.275, 0.001);
 			node.add(swapBtn);
 			const swapLbl = self.createTextMesh(t('btn_swap'), 256, 30, 20);
-			swapLbl.position.set(0.04, -0.325, 0.002);
+			swapLbl.position.set(0.04, -0.275, 0.002);
 			node.add(swapLbl);
 			this._langLabels.push({ mesh: swapLbl, key: 'btn_swap' });
-			this.menuSwapRow = { y: -0.325, btn: swapBtn };
+			this.menuSwapRow = { y: -0.275, btn: swapBtn };
 
 			// ── Button Real Size ──
 			node.add(new Mesh(
 				new PlaneGeometry(0.34, 0.002),
 				new MeshBasicMaterial({ color: 0x444444, side: DoubleSide })
-			)).position.set(0, -0.350, 0.001);
+			)).position.set(0, -0.300, 0.001);
 			const realSizeBtnGeo = new PlaneGeometry(0.26, 0.034);
 			const realSizeBtnMat = new MeshBasicMaterial({ color: 0x3a1a5a, side: DoubleSide });
 			const realSizeBtn = new Mesh(realSizeBtnGeo, realSizeBtnMat);
-			realSizeBtn.position.set(0.04, -0.375, 0.001);
+			realSizeBtn.position.set(0.04, -0.325, 0.001);
 			node.add(realSizeBtn);
-			const realSizeLbl = self.createTextMesh(t('btn_realsize'), 256, 30, 20);
-			realSizeLbl.position.set(0.04, -0.375, 0.002);
+			const realSizeLbl = self.createTextMesh(t('btn_realsize'), 180, 30, 20);
+			realSizeLbl.position.set(-0.01, -0.325, 0.002);
 			node.add(realSizeLbl);
 			this._langLabels.push({ mesh: realSizeLbl, key: 'btn_realsize' });
-			this.menuRealSizeRow = { y: -0.375, btn: realSizeBtn };
+			const realSizePillTrack = new Mesh(
+				new PlaneGeometry(0.048, 0.018),
+				new MeshBasicMaterial({ color: 0x663333, side: DoubleSide })
+			);
+			realSizePillTrack.position.set(0.13, -0.325, 0.002);
+			node.add(realSizePillTrack);
+			const realSizePillKnob = new Mesh(
+				new CircleGeometry(0.010, 16),
+				new MeshBasicMaterial({ color: 0xffffff, side: DoubleSide })
+			);
+			realSizePillKnob.position.set(0.113, -0.325, 0.003);
+			node.add(realSizePillKnob);
+			this.menuRealSizeRow = { y: -0.325, btn: realSizeBtn, pillTrack: realSizePillTrack, pillKnob: realSizePillKnob };
 
 			// Slider selection indicator
 			var selGeo = new PlaneGeometry(0.005, 0.06);
 			var selMat = new MeshBasicMaterial({ color: 0xffffff, side: DoubleSide });
 			this.menuSelector = new Mesh(selGeo, selMat);
 			node.add(this.menuSelector);
-			node.position.set(0, 0.05, -0.1);
+			node.position.set(0, 0.22, -0.25);
 			node.rotation.set(-Math.PI / 4, 0, 0);
 			controller.add(node);
 
@@ -89127,9 +89164,10 @@ ENDSEC
 			this._hintsVisible = true;
 			this.menuHintsPrev = false;
 			this.menuResetPrev = false;
-			this.menuClearPrev = false;
 			this.menuSwapPrev = false;
 			this.menuRealSizePrev = false;
+			this._realSizeActive = false;
+			this._realSizePrevScale = null;
 			this.btnMenuPrev = false;
 			this.btnAPrev = false;
 			this.btnBPrev = false;
@@ -89143,10 +89181,9 @@ ENDSEC
 
 		updateMenuSelector() {
 			if (!this.menuSelector || !this.menuSliders) return;
-			const totalRows = 1 + this.menuSliders.length + 5; // +hints +reset +clear +swap +realSize
-			const hintsIdx = totalRows - 5;
-			const resetIdx = totalRows - 4;
-			const clearIdx = totalRows - 3;
+			const totalRows = 1 + this.menuSliders.length + 4; // +hints +reset +swap +realSize
+			const hintsIdx = totalRows - 4;
+			const resetIdx = totalRows - 3;
 			const swapIdx = totalRows - 2;
 			const realSizeIdx = totalRows - 1;
 			const sel = this.menuSelectedIndex;
@@ -89160,8 +89197,6 @@ ENDSEC
 				this.menuSelector.position.set(-0.155, this.menuHintsRow.y, 0.002);
 			} else if (sel === resetIdx) {
 				this.menuSelector.position.set(-0.155, this.menuResetRow.y, 0.002);
-			} else if (sel === clearIdx) {
-				this.menuSelector.position.set(-0.155, this.menuClearRow.y, 0.002);
 			} else if (sel === swapIdx) {
 				this.menuSelector.position.set(-0.155, this.menuSwapRow.y, 0.002);
 			} else {
@@ -89170,25 +89205,22 @@ ENDSEC
 
 			if (this.menuHintsRow) {
 				const on = this._hintsVisible !== false;
-				if (sel === hintsIdx) {
-					this.menuHintsRow.btn.material.color.set(0xbbbb00);
-				} else if (on) {
-					this.menuHintsRow.btn.material.color.set(0x1a5a1a);
-				} else {
-					this.menuHintsRow.btn.material.color.set(0x5a1a1a);
-				}
+				const r = this.menuHintsRow;
+				r.btn.material.color.set(sel === hintsIdx ? 0x2a3a2a : 0x1a2a1a);
+				if (r.pillTrack) r.pillTrack.material.color.set(on ? 0x00aa44 : 0x663333);
+				if (r.pillKnob) r.pillKnob.position.x = on ? 0.147 : 0.113;
 			}
 			if (this.menuResetRow) {
 				this.menuResetRow.btn.material.color.set(sel === resetIdx ? 0x00aa44 : 0x1a4a2a);
-			}
-			if (this.menuClearRow) {
-				this.menuClearRow.btn.material.color.set(sel === clearIdx ? 0xff6600 : 0x5a2a10);
 			}
 			if (this.menuSwapRow) {
 				this.menuSwapRow.btn.material.color.set(sel === swapIdx ? 0x0055ff : 0x1a3a6a);
 			}
 			if (this.menuRealSizeRow) {
+				const on = this._realSizeActive === true;
 				this.menuRealSizeRow.btn.material.color.set(sel === realSizeIdx ? 0xcc44ff : 0x3a1a5a);
+				if (this.menuRealSizeRow.pillTrack) this.menuRealSizeRow.pillTrack.material.color.set(on ? 0x00aa44 : 0x663333);
+				if (this.menuRealSizeRow.pillKnob) this.menuRealSizeRow.pillKnob.position.x = on ? 0.147 : 0.113;
 			}
 		}
 
@@ -89230,7 +89262,7 @@ ENDSEC
 			const self = this;
 
 			// Panels
-			const bgGeo = new PlaneGeometry(0.38, 0.42);
+			const bgGeo = new PlaneGeometry(0.38, 0.46);
 			const bgMat = new MeshBasicMaterial({
 				color: 0x111122, transparent: true, opacity: 0.85, side: DoubleSide
 			});
@@ -89257,19 +89289,10 @@ ENDSEC
 					},
 				},
 				{
-					key: 'clip',
-					optionLabels: ['Clip: None', 'Clip: Highlight', 'Clip: Inside', 'Clip: Outside'],
-					getIndex: () => 0,
-					apply: (i) => {
-						const ct = Potree.ClipTask;
-						if (!ct) return;
-						self.viewer.setClipTask([ct.NONE, ct.HIGHLIGHT, ct.SHOW_INSIDE, ct.SHOW_OUTSIDE][i]);
-					},
-				},
-				{
 					key: 'measure',
-					optionLabels: ['Tool: —', 'Tool: Point', 'Tool: Distance', 'Tool: Height'],
+					optionLabels: ['Tool: —', 'Tool: Point', 'Tool: Distance', 'Tool: Height', 'Tool: Annotation'],
 					getIndex: () => {
+						if (self.vrAnnotateActive) return 4;
 						if (!self.vrMeasureActive || !self.vrMeasure) return 0;
 						const n = self.vrMeasure.name;
 						if (n === 'Point') return 1;
@@ -89278,13 +89301,53 @@ ENDSEC
 						return 0;
 					},
 					apply: (i) => {
+						self.vrAnnotateActive = false;
 						if (i === 0) { self.stopVRMeasurement(); return; }
+						if (i === 4) {
+							self.stopVRMeasurement();
+							self.vrAnnotateActive = true;
+							return;
+						}
 						const cfgs = [null,
 							{ showDistances: false, showCoordinates: true, maxMarkers: 1, closed: true, name: 'Point' },
 							{ showDistances: true, maxMarkers: Infinity, name: 'Distance' },
 							{ showDistances: false, showHeight: true, maxMarkers: 2, name: 'Height' },
 						];
 						self.startVRMeasurement(cfgs[i]);
+					},
+				},
+				{
+					key: ' EditMode',
+					optionLabels: ['Edit: OFF', 'Edit: ON'],
+					getIndex: () => self.vrEditMode ? 1 : 0,
+					apply: (i) => {
+						self.vrEditMode = (i === 1);
+						// Exit active measurement when entering edit mode
+						if (self.vrEditMode) {
+							self.stopVRMeasurement();
+							self.vrAnnotateActive = false;
+						}
+					},
+				},
+				{
+					key: 'clearAll',
+					optionLabels: ['⚠ Clear All Tools'],
+					getIndex: () => 0,
+					apply: () => {
+						if (self.vrMeasureActive) self.stopVRMeasurement();
+						self.viewer.scene.removeAllMeasurements();
+						// Remove Potree annotations
+						if (self.viewer.scene.annotations) {
+							const toRemove = [];
+							self.viewer.scene.annotations.children.forEach(a => toRemove.push(a));
+							toRemove.forEach(a => self.viewer.scene.annotations.remove(a));
+						}
+						// Remove VR annotation sprites
+						for (const ann of self._vrAnnotationSprites) {
+							self.viewer.sceneVR.remove(ann.sprite);
+						}
+						self._vrAnnotationSprites = [];
+						self._vrAnnotationCount = 0;
 					},
 				},
 				{
@@ -89295,18 +89358,45 @@ ENDSEC
 				},
 			];
 
+			// Binary toggles get a pill indicator instead of cycling text
+			const BINARY_KEYS = ['editMode'];
+
 			this.menu2Toggles = [];
 			toggleDefs.forEach((def, i) => {
 				const y = 0.195 - i * 0.040;
+				const isBinary = BINARY_KEYS.includes(def.key);
+
 				const btnGeo = new PlaneGeometry(0.26, 0.036);
 				const btnMat = new MeshBasicMaterial({ color: 0x223355, side: DoubleSide });
 				const btn = new Mesh(btnGeo, btnMat);
 				btn.position.set(0.04, y, 0.001);
 				node.add(btn);
-				const lbl = self.createTextMesh(def.optionLabels[0], 260, 32, 18);
-				lbl.position.set(0.04, y, 0.002);
+
+				// Binary: short label on the left + pill on the right
+				// Non-binary: full-width cycling label
+				const lblText = isBinary ? def.key.replace(/([A-Z])/g, ' $1').trim() : def.optionLabels[0];
+				const lbl = self.createTextMesh(lblText, isBinary ? 170 : 260, 32, 18);
+				lbl.position.set(isBinary ? -0.01 : 0.04, y, 0.002);
 				node.add(lbl);
-				self.menu2Toggles.push({ ...def, currentIndex: 0, btn, lbl, y });
+
+				let pillTrack = null, pillKnob = null;
+				if (isBinary) {
+					pillTrack = new Mesh(
+						new PlaneGeometry(0.048, 0.018),
+						new MeshBasicMaterial({ color: 0x663333, side: DoubleSide })
+					);
+					pillTrack.position.set(0.13, y, 0.002);
+					node.add(pillTrack);
+
+					pillKnob = new Mesh(
+						new CircleGeometry(0.010, 16),
+						new MeshBasicMaterial({ color: 0xffffff, side: DoubleSide })
+					);
+					pillKnob.position.set(0.113, y, 0.003);
+					node.add(pillKnob);
+				}
+
+				self.menu2Toggles.push({ ...def, currentIndex: 0, btn, lbl, y, isBinary, pillTrack, pillKnob });
 			});
 
 			this.menu2Sliders = [];
@@ -89316,7 +89406,7 @@ ENDSEC
 			this.menu2Selector = new Mesh(selGeo, selMat);
 			node.add(this.menu2Selector);
 
-			node.position.set(0, 0.05, -0.1);
+			node.position.set(0, 0.10, -0.25);
 			node.rotation.set(-Math.PI / 4, 0, 0);
 			controller.add(node);
 
@@ -89330,6 +89420,12 @@ ENDSEC
 			this.btnYPrev = false;
 
 			this.updateMenu2Selector();
+
+			// Floating label showing the active measurement/edit tool — above secondary controller
+			this.measureLabel = this.createTextMesh("", 220, 40, 22);
+			this.measureLabel.position.set(0, 0.12, 0);
+			this.measureLabel.visible = false;
+			controller.add(this.measureLabel);
 		}
 
 		updateMenu2Selector() {
@@ -89362,13 +89458,21 @@ ENDSEC
 			}
 		}
 
+		_updatePill(tog) {
+			if (!tog.isBinary || !tog.pillTrack || !tog.pillKnob) return;
+			const on = tog.currentIndex === 1;
+			tog.pillTrack.material.color.set(on ? 0x00aa44 : 0x663333);
+			tog.pillKnob.position.x = on ? 0.147 : 0.113;
+		}
+
 		syncMenu2Values() {
 			if (!this.menu2Toggles || !this.menu2Sliders) return;
 			// Sync toggles
 			this.menu2Toggles.forEach(t => {
 				if (t.key !== 'clip') {
 					t.currentIndex = t.getIndex();
-					t.lbl.setText(t.optionLabels[t.currentIndex]);
+					if (!t.isBinary) t.lbl.setText(t.optionLabels[t.currentIndex]);
+					this._updatePill(t);
 				}
 			});
 			// Sync sliders
@@ -89521,6 +89625,126 @@ ENDSEC
 			this.mode.start(this);
 		}
 
+		// ── VR EDIT MODE ─────────────────────────────────────────────────────────
+		// Laser-based: ray from secondary controller hits a measurement sphere,
+		// trigger grabs it and moves it along the ray at the initial grab distance.
+		_vrEditUpdate(delta) {
+			if (!this.vrEditMode || !this.cSecondary) {
+				if (this._editLaser) this._editLaser.node.visible = false;
+				return;
+			}
+
+			const ctrl = this.cSecondary;
+
+			// Ray in scene space from secondary controller
+			const origin = this.toScene(ctrl.position);
+			const fwd = new Vector3(0, 0, -1)
+				.applyQuaternion(ctrl.quaternion)
+				.applyQuaternion(this.node.quaternion)
+				.normalize();
+			const ray = new Ray(origin, fwd);
+
+			// Ensure the edit laser exists
+			if (!this._editLaser) {
+				this._editLaser = Potree.Utils.debugLine(
+					this.viewer.sceneVR,
+					new Vector3(), new Vector3(), 0xff8800
+				);
+				this._editLaser.node.material.depthTest = false;
+				this._editLaser.node.material.transparent = true;
+			}
+
+			// Ray-sphere hit detection (only when not currently dragging)
+			if (!this._vrEditDragging) {
+				let closestDist = Infinity;
+				let closestMeasure = null;
+				let closestIdx = -1;
+
+				const testSphere = new Sphere();
+				for (const measure of this.viewer.scene.measurements) {
+					for (let i = 0; i < measure.spheres.length; i++) {
+						const mesh = measure.spheres[i];
+						const center = mesh.getWorldPosition(new Vector3());
+						// Hit radius slightly larger than the visual sphere for easier targeting
+						testSphere.set(center, mesh.scale.x * 2.5);
+						if (ray.intersectsSphere(testSphere)) {
+							const d = origin.distanceTo(center);
+							if (d < closestDist) {
+								closestDist = d;
+								closestMeasure = measure;
+								closestIdx = i;
+								// Store distance to sphere CENTER for drag depth
+								this._vrEditGrabDist = d;
+							}
+						}
+					}
+				}
+				this._vrEditHoveredMeasure = closestMeasure;
+				this._vrEditHoveredIndex = closestIdx;
+			}
+
+			const hasTarget = this._vrEditHoveredMeasure && this._vrEditHoveredIndex >= 0;
+
+			// While dragging: move the point along the ray at the frozen grab distance
+			if (this._vrEditDragging && this._vrEditHoveredMeasure) {
+				const newScenePos = origin.clone().add(fwd.clone().multiplyScalar(this._vrEditGrabDist));
+				this._vrEditHoveredMeasure.setPosition(this._vrEditHoveredIndex, newScenePos);
+			}
+
+			// Laser: always visible — orange to hovered sphere, yellow while dragging, grey when searching
+			this._editLaser.node.visible = true;
+			if (hasTarget) {
+				const targetMesh = this._vrEditHoveredMeasure.spheres[this._vrEditHoveredIndex];
+				const targetVRPos = this.toVR(targetMesh.getWorldPosition(new Vector3()));
+				this._editLaser.set(ctrl.position, targetVRPos);
+				this._editLaser.node.material.color.set(this._vrEditDragging ? 0xffff00 : 0xff8800);
+			} else {
+				// No target: point forward 3m as a "searching" beam
+				const searchEnd = ctrl.position.clone().add(
+					new Vector3(0, 0, -1).applyQuaternion(ctrl.quaternion).multiplyScalar(3)
+				);
+				this._editLaser.set(ctrl.position, searchEnd);
+				this._editLaser.node.material.color.set(0x666666);
+			}
+		}
+
+		// ── VR ANNOTATIONS ────────────────────────────────────────────────────────
+		// Ray-cast from secondary controller, place a numbered annotation at the hit.
+		_vrPlaceAnnotation() {
+			const ctrl = this.cSecondary;
+			if (!ctrl) return;
+
+			const origin = this.toScene(ctrl.position);
+			const fwd = new Vector3(0, 0, -1)
+				.applyQuaternion(ctrl.quaternion)
+				.applyQuaternion(this.node.quaternion)
+				.normalize();
+
+			const hit = Utils.getVRPointCloudIntersectionCPU(
+				new Ray(origin, fwd),
+				this.viewer.scene.pointclouds,
+				{ projectOnRay: false, wideRadius: false }
+			);
+			if (!hit) return;
+
+			this._vrAnnotationCount++;
+			const label = String(this._vrAnnotationCount);
+
+			// Register in the Potree scene (visible in desktop view after exiting VR)
+			const annotation = new Annotation({
+				title: label,
+				position: hit.position.clone(),
+			});
+			this.viewer.scene.annotations.add(annotation);
+
+			// TextSprite visible in VR at the annotation position
+			const sprite = new Potree.TextSprite(label);
+			sprite.scale.set(0.15, 0.15, 0.15);
+			sprite.position.copy(this.toVR(hit.position));
+			this.viewer.sceneVR.add(sprite);
+			this._vrAnnotationSprites.push({ sprite, scenePos: hit.position.clone() });
+		}
+
 		onSqueezeStart(controller) {
 			// Grip is sensitive to natural hand tension — only cancel active measurement, nothing else
 			if (this.vrMeasureActive) {
@@ -89529,6 +89753,18 @@ ENDSEC
 		}
 
 		onTriggerStart(controller) {
+			// Edit mode: grab the nearest hovered sphere
+			if (this.vrEditMode && controller === this.cSecondary) {
+				if (this._vrEditHoveredMeasure && this._vrEditHoveredIndex >= 0) {
+					this._vrEditDragging = true;
+				}
+				return;
+			}
+			// Annotation mode: place a numbered annotation
+			if (this.vrAnnotateActive && controller === this.cSecondary) {
+				this._vrPlaceAnnotation();
+				return;
+			}
 			if (this.vrMeasureActive && this.vrMeasure && controller === this.cSecondary) {
 				this._vrMeasurePlace();
 				return;
@@ -89548,6 +89784,11 @@ ENDSEC
 		}
 
 		onTriggerEnd(controller) {
+			// Release edit drag
+			if (this.vrEditMode && controller === this.cSecondary && this._vrEditDragging) {
+				this._vrEditDragging = false;
+				return;
+			}
 			this.triggered.delete(controller);
 
 			if (this.navigationState === 'MANIPULATE') {
@@ -89600,6 +89841,7 @@ ENDSEC
 
 		onEnd() {
 			if (this.modeLabel) this.modeLabel.visible = false;
+			if (this.measureLabel) this.measureLabel.visible = false;
 		}
 
 		swapControllers() {
@@ -89621,6 +89863,10 @@ ENDSEC
 			if (this.modeLabel) {
 				oldPrimary.remove(this.modeLabel);
 				this.cPrimary.add(this.modeLabel);
+			}
+			if (this.measureLabel) {
+				oldSecondary.remove(this.measureLabel);
+				this.cSecondary.add(this.measureLabel);
 			}
 			if (this._hintGroups) {
 				if (this._hintGroups.primary) oldPrimary.remove(this._hintGroups.primary);
@@ -89673,6 +89919,27 @@ ENDSEC
 			const sceneDir = camVRDir.clone().applyQuaternion(this.node.quaternion).normalize();
 			this.viewer.scene.view.setView(camScenePos, camScenePos.clone().add(sceneDir));
 			this.viewer.setMoveSpeed(1.0);
+		}
+
+		_restorePrevScale() {
+			if (!this._realSizePrevScale) return;
+			const cam = this.viewer.renderer.xr.getCamera(fakeCam);
+			const camVRPos = cam.getWorldPosition(new Vector3());
+			const camVRDir = cam.getWorldDirection(new Vector3());
+			const camScenePos = this.toScene(camVRPos);
+			const currentScale = this.node.scale.x;
+			const k = this._realSizePrevScale / currentScale;
+
+			this.node.applyMatrix4(new Matrix4().makeTranslation(-camScenePos.x, -camScenePos.y, -camScenePos.z));
+			this.node.applyMatrix4(new Matrix4().makeScale(k, k, k));
+			this.node.applyMatrix4(new Matrix4().makeTranslation(camScenePos.x, camScenePos.y, camScenePos.z));
+			this.node.matrix.decompose(this.node.position, this.node.quaternion, this.node.scale);
+			this.node.updateMatrixWorld();
+
+			const sceneDir = camVRDir.clone().applyQuaternion(this.node.quaternion).normalize();
+			this.viewer.scene.view.setView(camScenePos, camScenePos.clone().add(sceneDir));
+			this.viewer.setMoveSpeed(this._realSizePrevScale);
+			this._realSizePrevScale = null;
 		}
 
 		_getControllerByHand(hand) {
@@ -89847,10 +90114,9 @@ ENDSEC
 				const gp = this.cPrimary.inputSource.gamepad;
 				const axisX = gp.axes[2] || 0;
 				const axisY = gp.axes[3] || 0;
-				const totalRows = 1 + (this.menuSliders ? this.menuSliders.length : 0) + 5; // +hints +reset +clear +swap +realSize
-				const hintsRowIdx = totalRows - 5;
-				const resetRowIdx = totalRows - 4;
-				const clearRowIdx = totalRows - 3;
+				const totalRows = 1 + (this.menuSliders ? this.menuSliders.length : 0) + 4; // +hints +reset +swap +realSize
+				const hintsRowIdx = totalRows - 4;
+				const resetRowIdx = totalRows - 3;
 				const swapRowIdx = totalRows - 2;
 				const realSizeRowIdx = totalRows - 1;
 
@@ -89878,7 +90144,6 @@ ENDSEC
 					this.menuModeNavPrev = false;
 					this.menuHintsPrev = false;
 					this.menuResetPrev = false;
-					this.menuClearPrev = false;
 					this.menuSwapPrev = false;
 					if (Math.abs(axisX) > 0.1) {
 						this.updateMenuSlider(this.menuSelectedIndex - 1, axisX);
@@ -89887,7 +90152,6 @@ ENDSEC
 					// Toggle Hints (debounced)
 					this.menuModeNavPrev = false;
 					this.menuResetPrev = false;
-					this.menuClearPrev = false;
 					this.menuSwapPrev = false;
 					if (Math.abs(axisX) > 0.5 && !this.menuHintsPrev) {
 						this._hintsVisible = this._hintsVisible === false;
@@ -89901,29 +90165,16 @@ ENDSEC
 					// Reset View (debounced)
 					this.menuModeNavPrev = false;
 					this.menuHintsPrev = false;
-					this.menuClearPrev = false;
 					this.menuSwapPrev = false;
 					if (Math.abs(axisX) > 0.5 && !this.menuResetPrev) {
 						this._resetView();
 					}
 					this.menuResetPrev = Math.abs(axisX) > 0.5;
-				} else if (this.menuSelectedIndex === clearRowIdx) {
-					// Clear All Measurements (debounced)
-					this.menuModeNavPrev = false;
-					this.menuHintsPrev = false;
-					this.menuResetPrev = false;
-					this.menuSwapPrev = false;
-					if (Math.abs(axisX) > 0.5 && !this.menuClearPrev) {
-						if (this.vrMeasureActive) this.stopVRMeasurement();
-						this.viewer.scene.removeAllMeasurements();
-					}
-					this.menuClearPrev = Math.abs(axisX) > 0.5;
 				} else if (this.menuSelectedIndex === swapRowIdx) {
 					// Swap Hands
 					this.menuModeNavPrev = false;
 					this.menuHintsPrev = false;
 					this.menuResetPrev = false;
-					this.menuClearPrev = false;
 					this.menuRealSizePrev = false;
 					if (Math.abs(axisX) > 0.5 && !this.menuSwapPrev) {
 						this.swapControllers();
@@ -89932,14 +90183,21 @@ ENDSEC
 					}
 					this.menuSwapPrev = Math.abs(axisX) > 0.5;
 				} else if (this.menuSelectedIndex === realSizeRowIdx) {
-					// Real Size
+					// Real Size toggle (ON = world scale 1:1, OFF = restore previous scale)
 					this.menuModeNavPrev = false;
 					this.menuHintsPrev = false;
 					this.menuResetPrev = false;
-					this.menuClearPrev = false;
 					this.menuSwapPrev = false;
 					if (Math.abs(axisX) > 0.5 && !this.menuRealSizePrev) {
-						this._applyRealWorldScale();
+						if (!this._realSizeActive) {
+							this._realSizePrevScale = this.node.scale.x;
+							this._realSizeActive = true;
+							this._applyRealWorldScale();
+						} else {
+							this._realSizeActive = false;
+							this._restorePrevScale();
+						}
+						this.updateMenuSelector();
 					}
 					this.menuRealSizePrev = Math.abs(axisX) > 0.5;
 				}
@@ -89980,7 +90238,8 @@ ENDSEC
 					if (Math.abs(axisX) > 0.5 && !this.menu2ModeNavPrev) {
 						const tog = this.menu2Toggles[this.menu2SelectedIndex];
 						tog.currentIndex = (tog.currentIndex + (axisX > 0 ? 1 : -1) + tog.optionLabels.length) % tog.optionLabels.length;
-						tog.lbl.setText(tog.optionLabels[tog.currentIndex]);
+						if (!tog.isBinary) tog.lbl.setText(tog.optionLabels[tog.currentIndex]);
+						this._updatePill(tog);
 						tog.apply(tog.currentIndex);
 					}
 					this.menu2ModeNavPrev = Math.abs(axisX) > 0.5;
@@ -90015,11 +90274,16 @@ ENDSEC
 				}
 				this.btnAPrev = btnA ? btnA.pressed : false;
 
-				// B: measurement (if right = secondary) or cycler navigation mode (if right = primary)
+				// B: measurement/edit/annotate toggle (if right = secondary) or nav mode cycle (if right = primary)
 				const btnB = gp.buttons[5];
 				if (btnB && btnB.pressed && !this.btnBPrev && !this.menuOpen && !this.menu2Open) {
 					if (rightCtrl === this.cSecondary) {
-						if (this.vrMeasureActive) {
+						if (this.vrEditMode) {
+							this.vrEditMode = false;
+							this._vrEditDragging = false;
+						} else if (this.vrAnnotateActive) {
+							this.vrAnnotateActive = false;
+						} else if (this.vrMeasureActive) {
 							this.stopVRMeasurement();
 						} else {
 							this.startVRMeasurement({ showDistances: true, maxMarkers: Infinity, name: 'Distance' });
@@ -90045,12 +90309,16 @@ ENDSEC
 				}
 				this.btnXPrev = btnX ? btnX.pressed : false;
 
-				// Y: measurement (if left = secondary) or cycler navigation mode (if left = primary)
-
+				// Y: measurement/edit/annotate toggle (if left = secondary) or nav mode cycle (if left = primary)
 				const btnY = gp.buttons[5];
 				if (btnY && btnY.pressed && !this.btnYPrev && !this.menuOpen && !this.menu2Open) {
 					if (leftCtrl === this.cSecondary) {
-						if (this.vrMeasureActive) {
+						if (this.vrEditMode) {
+							this.vrEditMode = false;
+							this._vrEditDragging = false;
+						} else if (this.vrAnnotateActive) {
+							this.vrAnnotateActive = false;
+						} else if (this.vrMeasureActive) {
 							this.stopVRMeasurement();
 						} else {
 							this.startVRMeasurement({ showDistances: true, maxMarkers: Infinity, name: 'Distance' });
@@ -90070,6 +90338,60 @@ ENDSEC
 			if (this.modeLabel) {
 				this.modeLabel.setText(this.navigationState);
 				this.updateModeButtons();
+			}
+			if (this.measureLabel) {
+				if (this.vrEditMode) {
+					this.measureLabel.setText("Edit Mode");
+					this.measureLabel.visible = true;
+				} else if (this.vrAnnotateActive) {
+					this.measureLabel.setText("Annotate");
+					this.measureLabel.visible = true;
+				} else if (this.vrMeasureActive && this.vrMeasure) {
+					this.measureLabel.setText(this.vrMeasure.name || "Measure");
+					this.measureLabel.visible = true;
+				} else {
+					this.measureLabel.visible = false;
+				}
+			}
+
+			// Edit mode: laser highlight + drag each frame
+			this._vrEditUpdate(delta);
+
+			// Annotation mode: always-visible laser from secondary controller
+			if (this.vrAnnotateActive && this.cSecondary) {
+				if (!this._annoLaser) {
+					this._annoLaser = Potree.Utils.debugLine(
+						this.viewer.sceneVR,
+						new Vector3(), new Vector3(), 0xcc44ff
+					);
+					this._annoLaser.node.material.depthTest = false;
+					this._annoLaser.node.material.transparent = true;
+				}
+				const ctrl = this.cSecondary;
+				const fwdVR = new Vector3(0, 0, -1).applyQuaternion(ctrl.quaternion);
+				const origin = this.toScene(ctrl.position);
+				const fwdScene = fwdVR.clone().applyQuaternion(this.node.quaternion).normalize();
+				const hit = Utils.getVRPointCloudIntersectionCPU(
+					new Ray(origin, fwdScene),
+					this.viewer.scene.pointclouds,
+					{ projectOnRay: false, wideRadius: false }
+				);
+				if (hit) {
+					this._annoLaser.set(ctrl.position, this.toVR(hit.position));
+					this._annoLaser.node.material.color.set(0xcc44ff);
+				} else {
+					const searchEnd = ctrl.position.clone().add(fwdVR.multiplyScalar(5));
+					this._annoLaser.set(ctrl.position, searchEnd);
+					this._annoLaser.node.material.color.set(0x663388);
+				}
+				this._annoLaser.node.visible = true;
+			} else if (this._annoLaser) {
+				this._annoLaser.node.visible = false;
+			}
+
+			// Keep annotation sprites aligned with the scene (node moves)
+			for (const ann of this._vrAnnotationSprites) {
+				ann.sprite.position.copy(this.toVR(ann.scenePos));
 			}
 
 			// Updated VR measurement preview marker (secondary controller)
