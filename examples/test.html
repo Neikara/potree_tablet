@@ -58,7 +58,7 @@
 		});
 		
 		// Lion
-		Potree.loadPointCloud("https://panorama.ulb.ac.be/potree/clouds/pointclouds/ElCastillo/ElCastillo_RGB/cloud.js", "elcastillo", function(e){
+		Potree.loadPointCloud("https://ulb-proxy.yannickkuy.workers.dev/potree/clouds/pointclouds/ElCastillo/ElCastillo_RGB/cloud.js", "elcastillo", function(e){
 			viewer.scene.addPointCloud(e.pointcloud);
 			
 			let material = e.pointcloud.material;
